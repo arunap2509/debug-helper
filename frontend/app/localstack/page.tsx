@@ -692,6 +692,7 @@ function QueueCard({
               autoFocus
             />
             <Button
+              variant="default"
               onClick={() => {
                 saveLabel();
                 setIsEditing(false);
@@ -712,7 +713,7 @@ function QueueCard({
           </div>
         )}
 
-        <Button variant="danger" onClick={() => setConfirmPurge(true)}>
+        <Button variant="default" onClick={() => setConfirmPurge(true)}>
           <Trash2 className="h-3.5 w-3.5" />
           Purge Queue
         </Button>
