@@ -8,6 +8,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 RUN_DIR="$ROOT_DIR/.run"
 
+BACKEND_PORT="${BACKEND_PORT:-8010}"
+FRONTEND_PORT="${FRONTEND_PORT:-3010}"
+
 log() { printf "\033[1;34m[stop]\033[0m %s\n" "$1"; }
 
 stop_pid_tree() {
@@ -41,8 +44,8 @@ for name in backend frontend; do
   fi
 done
 
-stop_listeners_on_port 8000
-stop_listeners_on_port 3000
+stop_listeners_on_port "$BACKEND_PORT"
+stop_listeners_on_port "$FRONTEND_PORT"
 
 log "stopping docker stack..."
 if [ "${1:-}" = "--volumes" ]; then
