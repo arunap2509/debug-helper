@@ -222,24 +222,25 @@ export default function WorkflowRunPage() {
       <div className="flex flex-wrap items-center gap-2">
         {workflow.steps.map((s, i) => {
           const sent = Boolean(sentByStep[s.id]);
-          const active = i === stepIndex;
+          const isCurrent = i === stepIndex;
+          const isPrevious = i < stepIndex;
 
           return (
             <button
               key={s.id}
               onClick={() => setStepIndex(i)}
               className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-mono transition-all ${
-                active
-                  ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300 shadow-sm font-semibold"
-                  : sent
-                  ? "border-slate-800 bg-slate-900/80 text-emerald-400"
-                  : "border-slate-800/80 bg-slate-950/60 text-slate-400 hover:border-slate-700"
+                isCurrent
+                  ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 shadow-md font-bold ring-1 ring-emerald-500/40"
+                  : isPrevious
+                  ? "border-slate-800/90 bg-slate-900/60 text-slate-400 opacity-75 hover:opacity-100 hover:border-slate-700"
+                  : "border-slate-800/60 bg-slate-950/40 text-slate-500 opacity-60 hover:opacity-90 hover:border-slate-800"
               }`}
             >
               {sent ? (
-                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
               ) : (
-                <span className="flex h-4 w-4 items-center justify-center rounded-md bg-slate-800 text-[10px] font-bold">
+                <span className={`flex h-4 w-4 items-center justify-center rounded-md text-[10px] font-bold ${isCurrent ? "bg-emerald-500/30 text-emerald-300" : "bg-slate-800/80 text-slate-400"}`}>
                   {i + 1}
                 </span>
               )}
