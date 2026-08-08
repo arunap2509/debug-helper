@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -245,7 +245,7 @@ function WorkflowCard({
   };
 
   return (
-    <Card className="border-slate-800/90 bg-slate-900/50 backdrop-blur-xl transition-all overflow-hidden">
+    <Card className="border-slate-800/90 bg-slate-900/50 backdrop-blur-xl transition-all overflow-visible relative">
       {/* Clickable Workflow Card Accordion Header */}
       <div
         onClick={() => !isEditingName && setIsWorkflowExpanded(!isWorkflowExpanded)}
@@ -477,6 +477,17 @@ function SearchableQueueSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const selectedQueue = queues?.find((q) => q.name === value);
   const displayTitle = selectedQueue
@@ -495,7 +506,7 @@ function SearchableQueueSelect({
   });
 
   return (
-    <div className="relative min-w-[240px]">
+    <div ref={containerRef} className="relative min-w-[240px]">
       <button
         type="button"
         disabled={disabled}
