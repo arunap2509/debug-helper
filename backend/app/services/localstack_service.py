@@ -27,22 +27,23 @@ def format_sqs_envelope(body: str) -> str:
     try:
         parsed = json.loads(body)
         if isinstance(parsed, dict):
-            if "message" in parsed:
-                msg_val = parsed["message"]
-                if not isinstance(msg_val, str):
-                    parsed["message"] = json.dumps(msg_val)
-                return json.dumps(parsed)
-            elif "Message" in parsed:
+            if "Message" in parsed:
                 msg_val = parsed["Message"]
                 if not isinstance(msg_val, str):
                     parsed["Message"] = json.dumps(msg_val)
+                return json.dumps(parsed)
+            elif "message" in parsed:
+                msg_val = parsed.pop("message")
+                if not isinstance(msg_val, str):
+                    msg_val = json.dumps(msg_val)
+                parsed["Message"] = msg_val
                 return json.dumps(parsed)
 
         inner_str = json.dumps(parsed)
     except Exception:
         inner_str = body
 
-    return json.dumps({"message": inner_str})
+    return json.dumps({"Message": inner_str})
 
 
 def send_message(cfg, queue_name: str, body: str):
