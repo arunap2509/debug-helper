@@ -12,6 +12,13 @@ def ping(cfg):
     resp.raise_for_status()
 
 
+def get_requests(cfg) -> list[dict]:
+    resp = requests.get(f"{base_url(cfg)}/__admin/requests", timeout=5)
+    resp.raise_for_status()
+    data = resp.json()
+    return data.get("requests", [])
+
+
 def list_mappings(cfg):
     resp = requests.get(f"{base_url(cfg)}/__admin/mappings", timeout=5)
     resp.raise_for_status()
