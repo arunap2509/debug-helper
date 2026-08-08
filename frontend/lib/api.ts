@@ -134,7 +134,7 @@ export const api = {
     get: (id: string) => request<Workflow>(`/api/workflows/${id}`),
     create: (name: string, localstackConn: string) =>
       request<Workflow>("/api/workflows", { method: "POST", body: JSON.stringify({ name, localstackConn }) }),
-    update: (id: string, patch: { name?: string; localstackConn?: string }) =>
+    update: (id: string, patch: { name?: string; localstackConn?: string; variables?: Record<string, string> }) =>
       request<Workflow>(`/api/workflows/${id}`, { method: "PUT", body: JSON.stringify(patch) }),
     remove: (id: string) => request<{ deleted: boolean }>(`/api/workflows/${id}`, { method: "DELETE" }),
 
@@ -175,10 +175,10 @@ export const api = {
         body: JSON.stringify(downstream),
       }),
 
-    send: (id: string, stepId: string, versionId?: string) =>
+    send: (id: string, stepId: string, versionId?: string, overrideBody?: string) =>
       request<SendMessageResult>(`/api/workflows/${id}/steps/${stepId}/send`, {
         method: "POST",
-        body: JSON.stringify({ versionId }),
+        body: JSON.stringify({ versionId, overrideBody }),
       }),
 
     getQueuePayloads: (queueName: string) =>

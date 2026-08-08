@@ -18,6 +18,7 @@ class CreateWorkflow(BaseModel):
 class UpdateWorkflow(BaseModel):
     name: str | None = None
     localstackConn: str | None = None
+    variables: dict[str, str] | None = None
 
 
 class AddStep(BaseModel):
@@ -27,7 +28,6 @@ class AddStep(BaseModel):
 
 class MoveStep(BaseModel):
     direction: str
-
 
 
 class AddVersion(BaseModel):
@@ -41,6 +41,7 @@ class SetActiveVersion(BaseModel):
 
 class SendStep(BaseModel):
     versionId: str | None = None
+    overrideBody: str | None = None
 
 
 def _not_found(exc: KeyError):
@@ -68,9 +69,24 @@ def get_workflow(workflow_id: str):
 @router.put("/{workflow_id}")
 def update_workflow(workflow_id: str, body: UpdateWorkflow):
     try:
-        return workflow_store.update(workflow_id, name=body.name, localstack_conn=body.localstackConn)
+        return workflow_store.update(
+            workflow_id, name=body.name, localstack_conn=body.localstackConn, variables=body.variables
+        )
     except KeyError as exc:
         raise _not_found(exc) from exc
+
+
+def _resolve_variables(body: str, variables: dict[str, str] | None) -> str:
+    if not variables:
+        return body
+    resolved = body
+    for k, v in variables.items():
+        if not k:
+            continue
+        resolved = resolved.replace(f"{{{{{k}}}}}", str(v))
+        resolved = resolved.replace(f"${{{k}}}", str(v))
+        resolved = resolved.replace(f"%{k}%", str(v))
+    return resolved
 
 
 @router.delete("/{workflow_id}")
@@ -177,7 +193,16 @@ def send_step(workflow_id: str, step_id: str, body: SendStep):
         step = next((s for s in wf.get("steps", []) if s["id"] == step_id), None)
         if not step:
             raise KeyError(step_id)
-        conn_id, queue_name, message_body = workflow_store.resolve_message(workflow_id, step_id, body.versionId)
+        
+        if body.overrideBody is not None:
+            conn_id = wf["localstackConn"]
+            queue_name = step["queueName"]
+            message_body = body.overrideBody
+        else:
+            conn_id, queue_name, message_body = workflow_store.resolve_message(workflow_id, step_id, body.versionId)
+        
+        # Substitute {{VAR}} placeholders with workflow variables
+        message_body = _resolve_variables(message_body, wf.get("variables"))
     except KeyError as exc:
         raise _not_found(exc) from exc
     except ValueError as exc:

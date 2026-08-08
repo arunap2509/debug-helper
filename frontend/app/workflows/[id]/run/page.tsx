@@ -13,10 +13,13 @@ import {
   Database,
   Globe,
   Layers,
+  Plus,
   RefreshCw,
   RotateCcw,
   Search,
   Send,
+  Sliders,
+  Trash2,
   Workflow as WorkflowIcon,
   Zap,
 } from "lucide-react";
@@ -131,7 +134,7 @@ export default function WorkflowRunPage() {
         await api.workflows.updateVersion(workflow.id, step.id, selectedVersion.id, selectedVersion.label, currentBody);
       }
 
-      const result = await api.workflows.send(workflow.id, step.id, versionIdToSend);
+      const result = await api.workflows.send(workflow.id, step.id, versionIdToSend, currentBody);
       setSentByStep((s) => ({ ...s, [step.id]: result }));
       setTelemetryKey((k) => k + 1);
     } catch (e) {
@@ -206,6 +209,9 @@ export default function WorkflowRunPage() {
           );
         })}
       </div>
+
+      {/* Workflow Variables Run Bar */}
+      <WorkflowVariablesRunBar workflow={workflow} onUpdate={setWorkflow} />
 
       {/* Main Execution Card */}
       <Card className="p-6 border-slate-800/90 bg-slate-900/50 backdrop-blur-xl space-y-5">
@@ -291,7 +297,7 @@ export default function WorkflowRunPage() {
           <JsonEditor
             value={currentBody}
             onChange={(val) => setCustomBodyByStep((prev) => ({ ...prev, [step.id]: val }))}
-            height="140px"
+            height="320px"
           />
 
           {!bodyCheck.valid && (
@@ -598,6 +604,64 @@ function WorkflowTelemetryPanel({ workflowId, refreshKey }: { workflowId: string
         )}
       </div>
     </Card>
+  );
+}
+
+function WorkflowVariablesRunBar({
+  workflow,
+  onUpdate,
+}: {
+  workflow: Workflow;
+  onUpdate: (wf: Workflow) => void;
+}) {
+  const vars = workflow.variables ?? {};
+  const varEntries = Object.entries(vars);
+  const [editingVars, setEditingVars] = useState<Record<string, string>>(vars);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setEditingVars(workflow.variables ?? {});
+  }, [workflow.variables]);
+
+  if (varEntries.length === 0) return null;
+
+  const handleBlurSave = async () => {
+    setSaving(true);
+    try {
+      const updated = await api.workflows.update(workflow.id, { variables: editingVars });
+      onUpdate(updated);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3.5 space-y-2">
+      <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+        <span className="flex items-center gap-1.5">
+          <Sliders className="h-3.5 w-3.5 text-emerald-400" />
+          Workflow Variables (Substituted automatically in step message payloads)
+        </span>
+        {saving && <span className="text-[10px] text-emerald-400">Saving variables...</span>}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+        {varEntries.map(([k, v]) => (
+          <div key={k} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-mono">
+            <span className="font-bold text-emerald-400 shrink-0">{"{{"}{k}{"}}"}</span>
+            <input
+              type="text"
+              value={editingVars[k] ?? v}
+              onChange={(e) => setEditingVars((prev) => ({ ...prev, [k]: e.target.value }))}
+              onBlur={handleBlurSave}
+              className="flex-1 bg-transparent text-slate-200 focus:outline-none min-w-0"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

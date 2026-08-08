@@ -94,6 +94,7 @@ def create(name: str, localstack_conn: str) -> dict:
         "id": _new_id("wf"),
         "name": name or "Untitled workflow",
         "localstackConn": localstack_conn,
+        "variables": {},
         "steps": [],
         "createdAt": _now(),
         "updatedAt": _now(),
@@ -103,13 +104,15 @@ def create(name: str, localstack_conn: str) -> dict:
     return wf
 
 
-def update(workflow_id: str, name: str | None = None, localstack_conn: str | None = None) -> dict:
+def update(workflow_id: str, name: str | None = None, localstack_conn: str | None = None, variables: dict[str, str] | None = None) -> dict:
     state = _load()
     wf = _find(state, workflow_id)
     if name is not None:
         wf["name"] = name
     if localstack_conn is not None:
         wf["localstackConn"] = localstack_conn
+    if variables is not None:
+        wf["variables"] = variables
     wf["updatedAt"] = _now()
     _save(state)
     return wf

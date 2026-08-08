@@ -130,6 +130,7 @@ export interface Workflow {
   id: string;
   name: string;
   localstackConn: string;
+  variables?: Record<string, string>;
   steps: WorkflowStep[];
   createdAt: string;
   updatedAt: string;
