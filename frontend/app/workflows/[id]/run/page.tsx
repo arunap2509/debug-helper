@@ -253,122 +253,146 @@ export default function WorkflowRunPage() {
       {/* Workflow Variables Run Bar */}
       <WorkflowVariablesRunBar workflow={workflow} onUpdate={setWorkflow} />
 
-      {/* Main Execution Card */}
-      <Card className="p-6 border-slate-800/90 bg-slate-900/50 backdrop-blur-xl space-y-5">
-        {/* Step Destination Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4">
-          <div className="space-y-1">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Target Queue Listener</div>
-            <div className="font-mono text-lg font-bold text-slate-100 flex flex-wrap items-center gap-2">
-              <span>{step.queueName}</span>
-              <Badge tone="blue">SQS Queue</Badge>
-
-              <Button
-                variant="danger"
-                onClick={handlePurgeQueue}
-                disabled={purging}
-                className="ml-2 py-1 px-2.5 text-xs"
-              >
-                {purging ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
-                Purge Queue
-              </Button>
-              {purgedQueue === step.queueName && (
-                <span className="flex items-center gap-1 text-xs font-semibold text-rose-400 animate-fade-in">
-                  <Check className="h-3.5 w-3.5 text-rose-400" /> Queue Purged!
-                </span>
-              )}
+      {/* Workflow Completed Summary View when all steps sent */}
+      {sentCount === workflow.steps.length && workflow.steps.length > 0 ? (
+        <Card className="p-8 border-emerald-500/40 bg-emerald-950/20 backdrop-blur-xl space-y-5 text-center">
+          <div className="flex justify-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg">
+              <Check className="h-7 w-7" />
             </div>
           </div>
-
-          {sentByStep[step.id] && (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-right text-xs">
-              <div className="flex items-center gap-1.5 font-semibold text-emerald-300">
-                <Check className="h-3.5 w-3.5 text-emerald-400" />
-                Dispatched to Listener
-              </div>
-              <div className="font-mono text-[11px] text-slate-400 mt-0.5">
-                Message ID: <span className="text-slate-200">{sentByStep[step.id].messageId}</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* User-Configured Message Versions Selector */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
-            <span className="flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-emerald-400" />
-              Configured Message Versions
-            </span>
-            <span className="text-[11px] text-slate-500">{userVersions.length} Version(s) Configured</span>
+          <div className="space-y-1 font-mono">
+            <h3 className="text-lg font-bold text-slate-100">Workflow Run Completed!</h3>
+            <p className="text-xs text-slate-400 font-sans">
+              All {workflow.steps.length} queue steps in &quot;{workflow.name}&quot; have been executed and dispatched.
+            </p>
           </div>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <Button variant="primary" onClick={restart}>
+              <RotateCcw className="h-4 w-4" />
+              Start New Run
+            </Button>
+            <Button variant="danger" onClick={handleDeleteRun}>
+              <Trash2 className="h-4 w-4" />
+              Clear Run History
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        /* Main Execution Card */
+        <Card className="p-6 border-slate-800/90 bg-slate-900/50 backdrop-blur-xl space-y-5">
+          {/* Step Destination Header */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4">
+            <div className="space-y-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Target Queue Listener</div>
+              <div className="font-mono text-lg font-bold text-slate-100 flex flex-wrap items-center gap-2">
+                <span>{step.queueName}</span>
+                <Badge tone="blue">SQS Queue</Badge>
 
-          {userVersions.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950 p-4 text-xs text-slate-500">
-              {CONSTANTS.LABELS.NO_VERSIONS_WARNING}
+                <Button
+                  variant="danger"
+                  onClick={handlePurgeQueue}
+                  disabled={purging}
+                  className="ml-2 py-1 px-2.5 text-xs"
+                >
+                  {purging ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
+                  Purge Queue
+                </Button>
+                {purgedQueue === step.queueName && (
+                  <span className="flex items-center gap-1 text-xs font-semibold text-rose-400 animate-fade-in">
+                    <Check className="h-3.5 w-3.5 text-rose-400" /> Queue Purged!
+                  </span>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {userVersions.map((v, idx) => {
-                const isActive = activeVersionIdx === idx;
-                const isDefault = v.id === step.activeVersionId;
 
-                return (
-                  <button
-                    key={v.id}
-                    onClick={() => handleSelectVersion(idx)}
-                    className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-left text-xs font-mono transition-all border ${
-                      isActive
-                        ? "border-emerald-500/60 bg-emerald-500/20 text-emerald-200 shadow-sm"
-                        : "border-slate-800 bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:border-slate-700"
-                    }`}
-                  >
-                    <span className="flex h-4 w-4 items-center justify-center rounded bg-slate-800 text-[9px] font-bold text-slate-300">
-                      v{idx + 1}
-                    </span>
-                    <span className="font-semibold">{v.label}</span>
-                    {isDefault && <Badge tone="amber">default</Badge>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* JSON Payload Editor / Inspector */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-slate-300 flex items-center gap-1.5">
-              <Code className="h-3.5 w-3.5 text-emerald-400" />
-              Message Payload JSON
-            </span>
-            {userVersions[activeVersionIdx] && (
-              <span className="text-[11px] text-slate-500">
-                Active: {userVersions[activeVersionIdx].label}
-              </span>
+            {sentByStep[step.id] && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-right text-xs">
+                <div className="flex items-center gap-1.5 font-semibold text-emerald-300">
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  Dispatched to Listener
+                </div>
+                <div className="font-mono text-[11px] text-slate-400 mt-0.5">
+                  Message ID: <span className="text-slate-200">{sentByStep[step.id].messageId}</span>
+                </div>
+              </div>
             )}
           </div>
 
-          <JsonEditor
-            value={currentBody}
-            onChange={(val) => setCustomBodyByStep((prev) => ({ ...prev, [step.id]: val }))}
-            height="320px"
-          />
+          {/* User-Configured Message Versions Selector */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-emerald-400" />
+                Configured Message Versions
+              </span>
+              <span className="text-[11px] text-slate-500">{userVersions.length} Version(s) Configured</span>
+            </div>
 
-          {!bodyCheck.valid && (
-            <p className="text-[11px] text-rose-400">{bodyCheck.message}</p>
+            {userVersions.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950 p-4 text-xs text-slate-500">
+                {CONSTANTS.LABELS.NO_VERSIONS_WARNING}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {userVersions.map((v, idx) => {
+                  const isActive = activeVersionIdx === idx;
+                  const isDefault = v.id === step.activeVersionId;
+
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => handleSelectVersion(idx)}
+                      className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-left text-xs font-mono transition-all border ${
+                        isActive
+                          ? "border-emerald-500/60 bg-emerald-500/20 text-emerald-200 shadow-sm"
+                          : "border-slate-800 bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                      }`}
+                    >
+                      <span className="flex h-4 w-4 items-center justify-center rounded bg-slate-800 text-[9px] font-bold text-slate-300">
+                        v{idx + 1}
+                      </span>
+                      <span className="font-semibold">{v.label}</span>
+                      {isDefault && <Badge tone="amber">default</Badge>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Payload Editor */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-slate-300">JSON Payload</span>
+              <div className="flex items-center gap-2">
+                {!bodyCheck.valid && bodyCheck.message && (
+                  <span className="text-[11px] font-mono text-rose-400">{bodyCheck.message}</span>
+                )}
+                <Badge tone={bodyCheck.valid ? "green" : "red"}>
+                  {bodyCheck.valid ? "valid JSON" : "invalid JSON"}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+              <JsonEditor
+                value={currentBody}
+                onChange={(val) => setCustomBodyByStep((prev) => ({ ...prev, [step.id]: val }))}
+                height="320px"
+              />
+            </div>
+          </div>
+
+          {/* Error Message Alert */}
+          {sendError && (
+            <div className="animate-fade-in">
+              <ErrorBox message={sendError} />
+            </div>
           )}
-        </div>
 
-        {sendError && <ErrorBox message={sendError} />}
-
-        {/* Action Controls */}
-        <div className="flex items-center justify-between border-t border-slate-800 pt-4">
-          <div className="flex items-center gap-2">
-            <Button onClick={() => setStepIndex((i) => Math.max(0, i - 1))} disabled={stepIndex === 0}>
-              <ChevronLeft className="h-3.5 w-3.5" />
-              Previous Step
-            </Button>
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3 pt-2">
             <Button
               onClick={() => setStepIndex((i) => Math.min(workflow.steps.length - 1, i + 1))}
               disabled={stepIndex === workflow.steps.length - 1}
@@ -377,17 +401,8 @@ export default function WorkflowRunPage() {
               <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
-
-          <Button
-            variant="primary"
-            onClick={handleSend}
-            disabled={sending || !bodyCheck.valid || !currentBody.trim()}
-          >
-            {sending ? <Spinner /> : <Send className="h-3.5 w-3.5" />}
-            Send to {step.queueName}
-          </Button>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {/* Live Cross-Service Telemetry Audit Log */}
       <WorkflowTelemetryPanel workflowId={workflow.id} refreshKey={telemetryKey} />

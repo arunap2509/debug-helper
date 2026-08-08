@@ -311,12 +311,7 @@ function WorkflowCard({
 
         <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
           {workflow.steps.length > 0 && (
-            <Link
-              href={`/workflows/${workflow.id}/run`}
-              onClick={() => {
-                api.workflows.resetRunSession(workflow.id).catch(() => null);
-              }}
-            >
+            <Link href={`/workflows/${workflow.id}/run`}>
               <Button variant="success">
                 <Play className="h-3.5 w-3.5" />
                 Run Workflow

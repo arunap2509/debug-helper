@@ -380,42 +380,53 @@ def get_workflow_telemetry(workflow_id: str):
         raise _not_found(exc) from exc
 
     active_run = workflow_run_store.get_active_run(workflow_id)
-    events = workflow_run_store.get_telemetry_events(workflow_id)
-
-    localstack_events = [e for e in events if e.get("service") == "localstack"]
-    wiremock_events = [e for e in events if e.get("service") == "wiremock"]
-    redis_events = [e for e in events if e.get("service") == "redis"]
-    postgres_events = [e for e in events if e.get("service") == "postgres"]
-
     started_ms = active_run.get("startedAtMs")
+
+    localstack_events = []
+    wiremock_events = []
+    redis_events = []
+    postgres_events = []
+
+    if not started_ms:
+        return {
+            "workflowId": workflow_id,
+            "workflowName": wf["name"],
+            "runId": active_run.get("runId"),
+            "startedAt": None,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "localstack": [],
+            "wiremock": [],
+            "redis": [],
+            "postgres": [],
+        }
+
     configs = config_store.get_all()
 
-    # Query live Wiremock Admin requests logged since startedAtMs
-    if started_ms:
-        for conn in configs:
-            if conn.get("type") == "wiremock":
-                try:
-                    wm_cfg = conn["fields"]
-                    wiremock_reqs = wiremock_service.get_requests(wm_cfg)
-                    for req in wiremock_reqs:
-                        logged_date = req.get("loggedDate", 0)
-                        if logged_date >= started_ms:
-                            req_data = req.get("request", {})
-                            resp_data = req.get("response", {})
-                            wiremock_events.append(
-                                {
-                                    "id": f"wm-req-{req.get('id', 'req')}",
-                                    "service": "wiremock",
-                                    "action": f"HTTP {req_data.get('method', 'POST')} {req_data.get('url', '/')}",
-                                    "time": datetime.fromtimestamp(logged_date / 1000, tz=timezone.utc).isoformat(),
-                                    "status": resp_data.get("status"),
-                                    "body": req_data.get("body"),
-                                }
-                            )
-                except Exception:
-                    pass
+    # 1. Query connected Wiremock containers for admin requests logged >= startedAtMs
+    for conn in configs:
+        if conn.get("type") == "wiremock":
+            try:
+                wm_cfg = conn["fields"]
+                wiremock_reqs = wiremock_service.get_requests(wm_cfg)
+                for req in wiremock_reqs:
+                    logged_date = req.get("loggedDate", 0)
+                    if logged_date >= started_ms:
+                        req_data = req.get("request", {})
+                        resp_data = req.get("response", {})
+                        wiremock_events.append(
+                            {
+                                "id": f"wm-req-{req.get('id', 'req')}",
+                                "service": "wiremock",
+                                "action": f"HTTP {req_data.get('method', 'POST')} {req_data.get('url', '/')}",
+                                "time": datetime.fromtimestamp(logged_date / 1000, tz=timezone.utc).isoformat(),
+                                "status": resp_data.get("status"),
+                                "body": req_data.get("body"),
+                            }
+                        )
+            except Exception:
+                pass
 
-    # Inspect live wh-redis for messages consumed by wh-listener daemon
+    # 2. Query connected Redis containers for queue messages or keys modified >= startedAtMs
     for conn in configs:
         if conn.get("type") == "redis":
             try:
@@ -424,25 +435,24 @@ def get_workflow_telemetry(workflow_id: str):
                     queue_name = step.get("queueName")
                     if not queue_name:
                         continue
-                    if step["id"] in active_run.get("sentStepIds", []):
-                        try:
-                            key_data = redis_service.get_key(r_cfg, 0, f"queue:{queue_name}:latest")
-                            val = key_data.get("value") if isinstance(key_data, dict) else str(key_data)
-                            if val:
-                                redis_events.append(
-                                    {
-                                        "id": f"redis-consumed-{queue_name}",
-                                        "service": "redis",
-                                        "time": datetime.now(timezone.utc).isoformat(),
-                                        "key": f"queue:{queue_name}:latest",
-                                        "action": f"CONSUMED_BY_LISTENER (queue/{queue_name})",
-                                        "command": f"RPUSH queue:{queue_name}:messages",
-                                        "body": val,
-                                    }
-                                )
-                        except KeyError:
-                            pass
-            except Exception:  # noqa: BLE001
+                    try:
+                        key_data = redis_service.get_key(r_cfg, 0, f"queue:{queue_name}:latest")
+                        val = key_data.get("value") if isinstance(key_data, dict) else str(key_data)
+                        if val:
+                            redis_events.append(
+                                {
+                                    "id": f"redis-consumed-{queue_name}",
+                                    "service": "redis",
+                                    "time": datetime.now(timezone.utc).isoformat(),
+                                    "key": f"queue:{queue_name}:latest",
+                                    "action": f"CONSUMED (queue/{queue_name})",
+                                    "command": f"GET queue:{queue_name}:latest",
+                                    "body": val,
+                                }
+                            )
+                    except KeyError:
+                        pass
+            except Exception:
                 pass
 
     return {
