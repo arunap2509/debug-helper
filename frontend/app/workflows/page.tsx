@@ -571,7 +571,6 @@ function SearchableQueueSelect({
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="font-semibold text-slate-100 truncate">{q.label ?? q.name}</div>
                     {hasAlias && <div className="text-[10px] font-mono text-slate-500 truncate">Queue: {q.name}</div>}
-                    <div className="text-[10px] font-mono text-slate-500 truncate">{q.url}</div>
                   </div>
                   {isSelected && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0 ml-2.5" />}
                 </button>
