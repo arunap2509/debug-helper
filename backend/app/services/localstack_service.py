@@ -1,6 +1,8 @@
 import requests
 import boto3
 
+SSM_GET_PARAMETERS_LIMIT = 10
+
 
 def _session(cfg):
     return boto3.Session(
@@ -93,7 +95,10 @@ def list_ssm_params(cfg):
     if not names:
         return []
 
-    values = ssm.get_parameters(Names=names, WithDecryption=True)["Parameters"]
+    values = []
+    for start in range(0, len(names), SSM_GET_PARAMETERS_LIMIT):
+        chunk = names[start : start + SSM_GET_PARAMETERS_LIMIT]
+        values.extend(ssm.get_parameters(Names=chunk, WithDecryption=True)["Parameters"])
     by_name = {v["Name"]: v for v in values}
     return [
         {"name": n, "value": by_name[n]["Value"], "type": by_name[n]["Type"]}

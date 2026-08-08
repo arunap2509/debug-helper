@@ -1,3 +1,5 @@
+import base64
+
 import redis
 
 FALLBACK_NUM_DBS = 16  # redis.conf default, only used if CONFIG GET is unavailable
@@ -8,10 +10,41 @@ def _client(cfg, db):
         host=cfg["host"],
         port=int(cfg["port"]),
         db=db,
-        decode_responses=True,
+        decode_responses=False,
         socket_connect_timeout=3,
         socket_timeout=3,
     )
+
+
+def _safe_text(value) -> str:
+    if isinstance(value, bytes):
+        try:
+            return value.decode("utf-8")
+        except UnicodeDecodeError:
+            encoded = base64.b64encode(value).decode("ascii")
+            return f"<binary:base64:{encoded}>"
+    return str(value)
+
+
+def _normalize(value):
+    if isinstance(value, bytes):
+        try:
+            return value.decode("utf-8")
+        except UnicodeDecodeError:
+            return {
+                "encoding": "base64",
+                "value": base64.b64encode(value).decode("ascii"),
+                "sizeBytes": len(value),
+            }
+    if isinstance(value, dict):
+        return {_safe_text(k): _normalize(v) for k, v in value.items()}
+    if isinstance(value, tuple):
+        return [_normalize(v) for v in value]
+    if isinstance(value, list):
+        return [_normalize(v) for v in value]
+    if isinstance(value, set):
+        return sorted((_normalize(v) for v in value), key=lambda item: str(item))
+    return value
 
 
 def ping(cfg):
@@ -47,15 +80,18 @@ def list_dbs(cfg):
 
 def _preview_value(c, key, type_):
     if type_ == "string":
-        return c.get(key)
+        return _normalize(c.get(key))
     if type_ == "hash":
-        return c.hgetall(key)
+        return _normalize(c.hgetall(key))
     if type_ == "list":
-        return c.lrange(key, 0, 49)
+        return _normalize(c.lrange(key, 0, 49))
     if type_ == "set":
-        return list(c.smembers(key))
+        return _normalize(c.smembers(key))
     if type_ == "zset":
-        return c.zrange(key, 0, 49, withscores=True)
+        return [
+            {"member": _normalize(member), "score": score}
+            for member, score in c.zrange(key, 0, 49, withscores=True)
+        ]
     return None
 
 
@@ -69,11 +105,11 @@ def list_keys(cfg, db: int, pattern: str = "*", limit: int = 300):
         for k in batch:
             if len(keys) >= limit:
                 break
-            type_ = c.type(k)
+            type_ = _safe_text(c.type(k))
             ttl = c.ttl(k)
             keys.append(
                 {
-                    "key": k,
+                    "key": _safe_text(k),
                     "type": type_,
                     "ttl": ttl,
                     "preview": _preview_value(c, k, type_),
@@ -90,7 +126,7 @@ def get_key(cfg, db: int, key: str):
     c = _client(cfg, db)
     if not c.exists(key):
         raise KeyError(key)
-    type_ = c.type(key)
+    type_ = _safe_text(c.type(key))
     return {"key": key, "type": type_, "ttl": c.ttl(key), "value": _preview_value(c, key, type_)}
 
 
@@ -127,8 +163,8 @@ def get_recent_activity(cfg, db: int = 0, queue_names: list[str] | None = None):
             for q_name in queue_names:
                 matching = c.keys(f"*{q_name}*")
                 for k in matching:
-                    t = c.type(k)
-                    active_keys.append({"key": k, "type": t, "ttl": c.ttl(k)})
+                    t = _safe_text(c.type(k))
+                    active_keys.append({"key": _safe_text(k), "type": t, "ttl": c.ttl(k)})
         return {"slowlog": logs, "keys": active_keys}
     except Exception:
         return {"slowlog": [], "keys": []}

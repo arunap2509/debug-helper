@@ -16,6 +16,19 @@ stop_pid_tree() {
   kill "$pid" >/dev/null 2>&1 || true
 }
 
+stop_listeners_on_port() {
+  local port="$1"
+  local pids
+  pids="$(lsof -ti tcp:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  [ -n "$pids" ] || return 0
+
+  for pid in $pids; do
+    log "stopping listener on port $port (pid $pid)"
+    stop_pid_tree "$pid"
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+}
+
 for name in backend frontend; do
   pidfile="$RUN_DIR/$name.pid"
   if [ -f "$pidfile" ]; then
@@ -27,6 +40,9 @@ for name in backend frontend; do
     rm -f "$pidfile"
   fi
 done
+
+stop_listeners_on_port 8000
+stop_listeners_on_port 3000
 
 log "stopping docker stack..."
 if [ "${1:-}" = "--volumes" ]; then
