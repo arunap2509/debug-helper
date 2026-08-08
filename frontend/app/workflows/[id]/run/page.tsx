@@ -691,14 +691,14 @@ function WorkflowVariablesRunBar({
           No variables active. Add variable keys below (e.g. <span className="font-mono text-slate-300">ASSET_ID</span>, <span className="font-mono text-slate-300">TITLE_ID</span>) to substitute in message payloads.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        <div className="flex flex-col gap-2.5">
           {varEntries.map(([k, v]) => {
             const pfx = prefixes[k];
             return (
-              <div key={k} className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono">
-                <span className="font-bold text-emerald-400 shrink-0">{"{{"}{k}{"}}"}</span>
+              <div key={k} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs font-mono w-full">
+                <span className="font-bold text-emerald-400 shrink-0 min-w-[140px]">{"{{"}{k}{"}}"}</span>
                 {pfx && (
-                  <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] text-amber-300 font-bold shrink-0">
+                  <span className="rounded bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-xs text-amber-300 font-bold shrink-0">
                     {pfx}
                   </span>
                 )}
@@ -708,14 +708,14 @@ function WorkflowVariablesRunBar({
                   onChange={(e) => setEditingVars((prev) => ({ ...prev, [k]: e.target.value }))}
                   onBlur={() => handleSave(editingVars)}
                   placeholder="Value..."
-                  className="flex-1 bg-transparent text-slate-200 focus:outline-none min-w-0"
+                  className="flex-1 bg-transparent text-slate-200 focus:outline-none min-w-0 font-mono text-xs"
                 />
                 <button
                   onClick={() => handleRemove(k)}
-                  className="text-slate-500 hover:text-rose-400 p-0.5 transition-colors"
+                  className="text-slate-500 hover:text-rose-400 p-1 transition-colors shrink-0"
                   title="Remove Variable"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             );
