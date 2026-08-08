@@ -137,6 +137,11 @@ export default function WorkflowRunPage() {
       const result = await api.workflows.send(workflow.id, step.id, versionIdToSend, currentBody);
       setSentByStep((s) => ({ ...s, [step.id]: result }));
       setTelemetryKey((k) => k + 1);
+
+      // Automatically advance to next step in workflow if not on last step
+      if (stepIndex < workflow.steps.length - 1) {
+        setStepIndex((idx) => idx + 1);
+      }
     } catch (e) {
       setSendError(String(e));
     } finally {
