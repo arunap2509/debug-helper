@@ -192,6 +192,8 @@ export const api = {
     getRunSession: (id: string) => request<WorkflowRunSession>(`/api/workflows/${id}/run-session`),
     resetRunSession: (id: string) =>
       request<WorkflowRunSession>(`/api/workflows/${id}/run-session/reset`, { method: "POST" }),
+    deleteRunSession: (id: string) =>
+      request<{ deleted: boolean }>(`/api/workflows/${id}/run-session`, { method: "DELETE" }),
     getTelemetry: async (id: string): Promise<WorkflowTelemetry | null> => {
       try {
         return await request<WorkflowTelemetry>(`/api/workflows/${id}/telemetry`);

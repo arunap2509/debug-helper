@@ -216,7 +216,7 @@ def send_step(workflow_id: str, step_id: str, body: SendStep):
     # 1. Dispatch SQS message to LocalStack
     try:
         result = localstack_service.send_message(cfg, queue_name, message_body)
-        workflow_run_store.record_step_sent(workflow_id, step_id)
+        workflow_run_store.record_step_sent(workflow_id, step_id, variables=wf.get("variables"))
         workflow_run_store.record_telemetry_event(
             workflow_id,
             service="localstack",
@@ -358,6 +358,15 @@ def reset_run_session(workflow_id: str):
     return workflow_run_store.reset_run(workflow_id)
 
 
+@router.delete("/{workflow_id}/run-session")
+def delete_run_session(workflow_id: str):
+    try:
+        workflow_store.get(workflow_id)
+    except KeyError as exc:
+        raise _not_found(exc) from exc
+    return workflow_run_store.delete_active_run(workflow_id)
+
+
 @router.get("/queues/{queue_name}/payloads")
 def get_queue_payloads(queue_name: str):
     return queue_payload_store.get_versions(queue_name)
@@ -378,8 +387,35 @@ def get_workflow_telemetry(workflow_id: str):
     redis_events = [e for e in events if e.get("service") == "redis"]
     postgres_events = [e for e in events if e.get("service") == "postgres"]
 
-    # Inspect live wh-redis for messages consumed by wh-listener daemon
+    started_ms = active_run.get("startedAtMs")
     configs = config_store.get_all()
+
+    # Query live Wiremock Admin requests logged since startedAtMs
+    if started_ms:
+        for conn in configs:
+            if conn.get("type") == "wiremock":
+                try:
+                    wm_cfg = conn["fields"]
+                    wiremock_reqs = wiremock_service.get_requests(wm_cfg)
+                    for req in wiremock_reqs:
+                        logged_date = req.get("loggedDate", 0)
+                        if logged_date >= started_ms:
+                            req_data = req.get("request", {})
+                            resp_data = req.get("response", {})
+                            wiremock_events.append(
+                                {
+                                    "id": f"wm-req-{req.get('id', 'req')}",
+                                    "service": "wiremock",
+                                    "action": f"HTTP {req_data.get('method', 'POST')} {req_data.get('url', '/')}",
+                                    "time": datetime.fromtimestamp(logged_date / 1000, tz=timezone.utc).isoformat(),
+                                    "status": resp_data.get("status"),
+                                    "body": req_data.get("body"),
+                                }
+                            )
+                except Exception:
+                    pass
+
+    # Inspect live wh-redis for messages consumed by wh-listener daemon
     for conn in configs:
         if conn.get("type") == "redis":
             try:

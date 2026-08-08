@@ -52,6 +52,23 @@ export default function WorkflowRunPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [telemetryKey, setTelemetryKey] = useState(0);
+  const [purging, setPurging] = useState(false);
+  const [purgedQueue, setPurgedQueue] = useState<string | null>(null);
+
+  const handlePurgeQueue = async () => {
+    if (!step?.queueName) return;
+    setPurging(true);
+    try {
+      await api.localstack.purgeQueue("localstack", step.queueName);
+      setPurgedQueue(step.queueName);
+      setTelemetryKey((k) => k + 1);
+      setTimeout(() => setPurgedQueue(null), 2500);
+    } catch (e) {
+      console.error("Purge queue error:", e);
+    } finally {
+      setPurging(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -162,6 +179,19 @@ export default function WorkflowRunPage() {
     setTelemetryKey((k) => k + 1);
   };
 
+  const handleDeleteRun = async () => {
+    if (!workflow) return;
+    try {
+      await api.workflows.deleteRunSession(workflow.id);
+    } catch (e) {
+      console.error("Failed to delete run session:", e);
+    }
+    setSentByStep({});
+    setStepIndex(0);
+    setSendError(null);
+    setTelemetryKey((k) => k + 1);
+  };
+
   return (
     <div className="space-y-6 pb-12">
       <BackLink />
@@ -179,6 +209,10 @@ export default function WorkflowRunPage() {
             <Button variant="default" onClick={restart}>
               <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
               Reset Pipeline
+            </Button>
+            <Button variant="danger" onClick={handleDeleteRun}>
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete Run Session
             </Button>
           </div>
         }
@@ -221,12 +255,27 @@ export default function WorkflowRunPage() {
       {/* Main Execution Card */}
       <Card className="p-6 border-slate-800/90 bg-slate-900/50 backdrop-blur-xl space-y-5">
         {/* Step Destination Header */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4">
+          <div className="space-y-1">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Target Queue Listener</div>
-            <div className="font-mono text-lg font-bold text-slate-100 flex items-center gap-2">
+            <div className="font-mono text-lg font-bold text-slate-100 flex flex-wrap items-center gap-2">
               <span>{step.queueName}</span>
               <Badge tone="blue">SQS Queue</Badge>
+
+              <Button
+                variant="danger"
+                onClick={handlePurgeQueue}
+                disabled={purging}
+                className="ml-2 py-1 px-2.5 text-xs"
+              >
+                {purging ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
+                Purge Queue
+              </Button>
+              {purgedQueue === step.queueName && (
+                <span className="flex items-center gap-1 text-xs font-semibold text-rose-400 animate-fade-in">
+                  <Check className="h-3.5 w-3.5 text-rose-400" /> Queue Purged!
+                </span>
+              )}
             </div>
           </div>
 
