@@ -614,22 +614,36 @@ function WorkflowVariablesRunBar({
   workflow: Workflow;
   onUpdate: (wf: Workflow) => void;
 }) {
-  const vars = workflow.variables ?? {};
-  const varEntries = Object.entries(vars);
-  const [editingVars, setEditingVars] = useState<Record<string, string>>(vars);
+  const [prefixes, setPrefixes] = useState<Record<string, string>>({});
+  const [editingVars, setEditingVars] = useState<Record<string, string>>({});
+  const [newKey, setNewKey] = useState("");
+  const [newValue, setNewValue] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setEditingVars(workflow.variables ?? {});
-  }, [workflow.variables]);
+    api.connections.getVariablePrefixes().then((pfx) => {
+      const globalPfx = pfx ?? {};
+      setPrefixes(globalPfx);
 
-  if (varEntries.length === 0) return null;
+      const existingVars = { ...(workflow.variables ?? {}) };
+      // Auto-initialize any Admin configured prefix keys if missing
+      Object.entries(globalPfx).forEach(([k, p]) => {
+        if (!(k in existingVars)) {
+          existingVars[k] = p ? `${p}001` : "";
+        }
+      });
+      setEditingVars(existingVars);
+    }).catch(() => {
+      setEditingVars(workflow.variables ?? {});
+    });
+  }, [workflow.id, workflow.variables]);
 
-  const handleBlurSave = async () => {
+  const handleSave = async (updated: Record<string, string>) => {
     setSaving(true);
     try {
-      const updated = await api.workflows.update(workflow.id, { variables: editingVars });
-      onUpdate(updated);
+      const res = await api.workflows.update(workflow.id, { variables: updated });
+      onUpdate(res);
+      setEditingVars(res.variables ?? updated);
     } catch (e) {
       console.error(e);
     } finally {
@@ -637,29 +651,98 @@ function WorkflowVariablesRunBar({
     }
   };
 
+  const handleAdd = () => {
+    if (!newKey.trim()) return;
+    const cleanKey = newKey.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+    const pfx = prefixes[cleanKey] ?? "";
+    const val = newValue.trim();
+    const finalVal = pfx && !val.startsWith(pfx) ? `${pfx}${val}` : val || `${pfx}001`;
+    const updated = { ...editingVars, [cleanKey]: finalVal };
+    setNewKey("");
+    setNewValue("");
+    handleSave(updated);
+  };
+
+  const handleRemove = (k: string) => {
+    const updated = { ...editingVars };
+    delete updated[k];
+    handleSave(updated);
+  };
+
+  const varEntries = Object.entries(editingVars);
+
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3.5 space-y-2">
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
-        <span className="flex items-center gap-1.5">
-          <Sliders className="h-3.5 w-3.5 text-emerald-400" />
-          Workflow Variables (Substituted automatically in step message payloads)
-        </span>
-        {saving && <span className="text-[10px] text-emerald-400">Saving variables...</span>}
+    <div className="rounded-2xl border border-slate-800/90 bg-slate-900/60 backdrop-blur-xl p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+          <Sliders className="h-4 w-4 text-emerald-400" />
+          <span>Workflow Variable Overrides & Placeholders</span>
+          <Badge tone={varEntries.length > 0 ? "green" : "neutral"}>
+            {varEntries.length} Active
+          </Badge>
+        </div>
+        <div className="text-[11px] text-slate-500">
+          Substituted in step payloads before dispatching to SQS
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-        {varEntries.map(([k, v]) => (
-          <div key={k} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-mono">
-            <span className="font-bold text-emerald-400 shrink-0">{"{{"}{k}{"}}"}</span>
-            <input
-              type="text"
-              value={editingVars[k] ?? v}
-              onChange={(e) => setEditingVars((prev) => ({ ...prev, [k]: e.target.value }))}
-              onBlur={handleBlurSave}
-              className="flex-1 bg-transparent text-slate-200 focus:outline-none min-w-0"
-            />
-          </div>
-        ))}
+      {varEntries.length === 0 ? (
+        <div className="text-xs text-slate-500 py-1">
+          No variables active. Add variable keys below (e.g. <span className="font-mono text-slate-300">ASSET_ID</span>, <span className="font-mono text-slate-300">TITLE_ID</span>) to substitute in message payloads.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {varEntries.map(([k, v]) => {
+            const pfx = prefixes[k];
+            return (
+              <div key={k} className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono">
+                <span className="font-bold text-emerald-400 shrink-0">{"{{"}{k}{"}}"}</span>
+                {pfx && (
+                  <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] text-amber-300 font-bold shrink-0">
+                    {pfx}
+                  </span>
+                )}
+                <input
+                  type="text"
+                  value={v}
+                  onChange={(e) => setEditingVars((prev) => ({ ...prev, [k]: e.target.value }))}
+                  onBlur={() => handleSave(editingVars)}
+                  placeholder="Value..."
+                  className="flex-1 bg-transparent text-slate-200 focus:outline-none min-w-0"
+                />
+                <button
+                  onClick={() => handleRemove(k)}
+                  className="text-slate-500 hover:text-rose-400 p-0.5 transition-colors"
+                  title="Remove Variable"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add inline variable on Run page */}
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/60">
+        <input
+          type="text"
+          value={newKey}
+          onChange={(e) => setNewKey(e.target.value)}
+          placeholder="New Key (e.g. ASSET_ID)"
+          className="w-44 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+        />
+        <input
+          type="text"
+          value={newValue}
+          onChange={(e) => setNewValue(e.target.value)}
+          placeholder="Value / Suffix (e.g. 001)"
+          className="flex-1 min-w-[140px] rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+        />
+        <Button variant="primary" onClick={handleAdd} disabled={saving || !newKey.trim()}>
+          {saving ? <Spinner /> : <Plus className="h-3.5 w-3.5" />}
+          Add Run Variable
+        </Button>
       </div>
     </div>
   );

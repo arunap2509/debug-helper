@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Save,
   Server,
+  Sliders,
   Trash2,
   Wifi,
   WifiOff,
@@ -457,6 +458,9 @@ export default function AdminPage() {
         )}
       </div>
 
+      {/* GLOBAL VARIABLE PREFIXES TABLE */}
+      <VariablePrefixesAdminTable />
+
       {/* CREATE CONNECTION MODAL */}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
@@ -577,5 +581,143 @@ export default function AdminPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function VariablePrefixesAdminTable() {
+  const [prefixes, setPrefixes] = useState<Record<string, string>>({});
+  const [newKey, setNewKey] = useState("");
+  const [newPrefix, setNewPrefix] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.connections.getVariablePrefixes()
+      .then((p) => setPrefixes(p ?? {}))
+      .catch((e) => console.error(e))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async (updated: Record<string, string>) => {
+    setSaving(true);
+    try {
+      const result = await api.connections.setVariablePrefixes(updated);
+      setPrefixes(result ?? {});
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAdd = () => {
+    if (!newKey.trim()) return;
+    const cleanKey = newKey.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+    const updated = { ...prefixes, [cleanKey]: newPrefix.trim() };
+    setNewKey("");
+    setNewPrefix("");
+    handleSave(updated);
+  };
+
+  const handleRemove = (keyToRemove: string) => {
+    const updated = { ...prefixes };
+    delete updated[keyToRemove];
+    handleSave(updated);
+  };
+
+  const entries = Object.entries(prefixes);
+
+  return (
+    <Card className="p-6 border-slate-800/90 bg-slate-900/50 backdrop-blur-xl space-y-4">
+      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <Sliders className="h-4 w-4 text-amber-400" />
+            Global Workflow Variable Prefixes
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Configure default constant prefixes for workflow variables (e.g. <code className="font-mono text-amber-300">ASSET_ID</code> prefix: <code className="font-mono text-amber-300">AST-REG-2026-</code>).
+          </p>
+        </div>
+        <Badge tone="amber">{entries.length} Prefixes Set</Badge>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-4 text-xs text-slate-500">
+          <Spinner />
+          <span>Loading variable prefixes...</span>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {entries.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-800 p-4 text-center text-xs text-slate-500">
+              No variable prefixes configured yet. Add default prefixes below!
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="border-b border-slate-800 bg-slate-900/80 text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2.5 font-semibold">Placeholder Key</th>
+                    <th className="px-4 py-2.5 font-semibold">Constant Prefix</th>
+                    <th className="px-4 py-2.5 text-right font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/80">
+                  {entries.map(([k, pfx]) => (
+                    <tr key={k} className="hover:bg-slate-900/40">
+                      <td className="px-4 py-2.5 font-bold text-emerald-400">{"{{"}{k}{"}}"}</td>
+                      <td className="px-4 py-2.5">
+                        <input
+                          type="text"
+                          value={pfx}
+                          onChange={(e) => {
+                            const updated = { ...prefixes, [k]: e.target.value };
+                            setPrefixes(updated);
+                          }}
+                          onBlur={() => handleSave(prefixes)}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs font-mono text-slate-200 focus:border-amber-500 focus:outline-none"
+                        />
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <button
+                          onClick={() => handleRemove(k)}
+                          className="rounded p-1 text-slate-500 hover:text-rose-400 transition-colors"
+                          title="Delete Prefix"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Add New Prefix Row */}
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <input
+              type="text"
+              value={newKey}
+              onChange={(e) => setNewKey(e.target.value)}
+              placeholder="Variable Key (e.g. ASSET_ID)"
+              className="w-48 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
+            />
+            <input
+              type="text"
+              value={newPrefix}
+              onChange={(e) => setNewPrefix(e.target.value)}
+              placeholder="Default Prefix (e.g. AST-REG-2026-)"
+              className="flex-1 min-w-[200px] rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
+            />
+            <Button variant="primary" onClick={handleAdd} disabled={saving || !newKey.trim()}>
+              {saving ? <Spinner /> : <Plus className="h-3.5 w-3.5" />}
+              Add Prefix Rule
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }

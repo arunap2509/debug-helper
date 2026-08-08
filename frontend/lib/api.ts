@@ -63,6 +63,12 @@ export const api = {
       request<Connection>(`/api/connections/${id}`, { method: "PUT", body: JSON.stringify(patch) }),
     reset: (id: string) => request<Connection>(`/api/connections/${id}/reset`, { method: "POST" }),
     remove: (id: string) => request<{ deleted: boolean }>(`/api/connections/${id}`, { method: "DELETE" }),
+    getVariablePrefixes: () => request<Record<string, string>>("/api/connections/variable-prefixes"),
+    setVariablePrefixes: (prefixes: Record<string, string>) =>
+      request<Record<string, string>>("/api/connections/variable-prefixes", {
+        method: "POST",
+        body: JSON.stringify({ prefixes }),
+      }),
   },
 
   postgres: {

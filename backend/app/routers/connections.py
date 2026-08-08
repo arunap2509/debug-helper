@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from .. import cache, config_store
+from .. import cache, config_store, store
 
 router = APIRouter(prefix="/api/connections", tags=["connections"])
 
@@ -17,6 +17,10 @@ class UpdateConnection(BaseModel):
     fields: dict | None = None
 
 
+class SetVariablePrefixes(BaseModel):
+    prefixes: dict[str, str]
+
+
 @router.get("")
 def list_connections():
     return config_store.get_all()
@@ -25,6 +29,17 @@ def list_connections():
 @router.get("/schema")
 def get_schema():
     return config_store.schemas()
+
+
+@router.get("/variable-prefixes")
+def get_variable_prefixes():
+    return store.get_json("app:variable_prefixes", {})
+
+
+@router.post("/variable-prefixes")
+def set_variable_prefixes(body: SetVariablePrefixes):
+    store.set_json("app:variable_prefixes", body.prefixes)
+    return body.prefixes
 
 
 @router.post("")
