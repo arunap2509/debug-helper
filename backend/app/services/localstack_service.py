@@ -26,11 +26,23 @@ def ping(cfg):
 def format_sqs_envelope(body: str) -> str:
     try:
         parsed = json.loads(body)
-        if isinstance(parsed, dict) and ("message" in parsed or "Message" in parsed):
-            return body
-        return json.dumps({"message": parsed})
+        if isinstance(parsed, dict):
+            if "message" in parsed:
+                msg_val = parsed["message"]
+                if not isinstance(msg_val, str):
+                    parsed["message"] = json.dumps(msg_val)
+                return json.dumps(parsed)
+            elif "Message" in parsed:
+                msg_val = parsed["Message"]
+                if not isinstance(msg_val, str):
+                    parsed["Message"] = json.dumps(msg_val)
+                return json.dumps(parsed)
+
+        inner_str = json.dumps(parsed)
     except Exception:
-        return json.dumps({"message": body})
+        inner_str = body
+
+    return json.dumps({"message": inner_str})
 
 
 def send_message(cfg, queue_name: str, body: str):
