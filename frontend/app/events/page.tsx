@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   Activity,
@@ -11,6 +12,7 @@ import {
   Database,
   Globe,
   Layers,
+  Plus,
   RefreshCw,
   Search,
   Server,
@@ -47,17 +49,26 @@ function EventsPageContent() {
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState("");
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const [copiedLogs, setCopiedLogs] = useState(false);
 
   // Data states
   const [logs, setLogs] = useState<any[]>([]);
   const [containerName, setContainerName] = useState<string>("");
+  const [warning, setWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const activeService = TAB_CONFIGS.find((t) => t.id === activeTab)!.service;
   const { connections, selected, setSelected, loadingConnections } = useConnections(activeService);
+
+  const handleTabChange = (tab: EventTab) => {
+    setActiveTab(tab);
+    setLogs([]);
+    setContainerName("");
+    setWarning(null);
+    setError(null);
+  };
 
   // Load workflow run session if workflowId is passed in URL
   useEffect(() => {
@@ -103,24 +114,35 @@ function EventsPageContent() {
 
     setLoading(true);
     setError(null);
+    setWarning(null);
 
     const sinceParam = sinceMs ? Math.floor(sinceMs / 1000) : undefined;
 
     if (activeTab === "postgres") {
       api.events
         .postgres(selected, sinceParam)
-        .then((res) => {
-          setContainerName(res.containerName);
-          setLogs(res.logs || []);
+        .then((res: any) => {
+          if (res.warning) {
+            setWarning(res.warning);
+            setLogs([]);
+          } else {
+            setContainerName(res.containerName);
+            setLogs(res.logs || []);
+          }
         })
         .catch((e) => setError(String(e)))
         .finally(() => setLoading(false));
     } else if (activeTab === "localstack") {
       api.events
         .localstack(selected, sinceParam)
-        .then((res) => {
-          setContainerName(res.containerName);
-          setLogs(res.logs || []);
+        .then((res: any) => {
+          if (res.warning) {
+            setWarning(res.warning);
+            setLogs([]);
+          } else {
+            setContainerName(res.containerName);
+            setLogs(res.logs || []);
+          }
         })
         .catch((e) => setError(String(e)))
         .finally(() => setLoading(false));
@@ -143,12 +165,7 @@ function EventsPageContent() {
     }
   };
 
-  useEffect(() => {
-    loadEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selected, sinceMs]);
-
-  // Auto refresh interval (every 3 seconds)
+  // Auto refresh interval (only when user manually turns ON autoRefresh)
   useEffect(() => {
     if (!autoRefresh) return;
     const timer = setInterval(() => {
@@ -186,9 +203,9 @@ function EventsPageContent() {
         subtitle="Un-truncated live subprocess docker logs and service event streams."
         action={
           <div className="flex items-center gap-3">
-            <Button variant="default" onClick={loadEvents} disabled={loading}>
-              <RefreshCw className={`h-3.5 w-3.5 text-slate-400 ${loading ? "animate-spin" : ""}`} />
-              Refresh Logs
+            <Button variant="primary" onClick={loadEvents} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              Fetch Logs
             </Button>
             <Button
               variant={autoRefresh ? "success" : "default"}
@@ -211,7 +228,7 @@ function EventsPageContent() {
             return (
               <button
                 key={t.id}
-                onClick={() => setActiveTab(t.id)}
+                onClick={() => handleTabChange(t.id)}
                 className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all border ${
                   isActive
                     ? `${theme.activeNav} border-slate-700 shadow-md font-bold`
@@ -363,6 +380,22 @@ function EventsPageContent() {
             <Spinner />
             <span>Loading target connections...</span>
           </div>
+        ) : warning ? (
+          <Card className="p-8 text-center space-y-4 max-w-xl mx-auto border-dashed border-amber-500/40 bg-amber-950/20">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-slate-100">No Container Name Configured</h3>
+              <p className="text-xs text-slate-400 mt-1">{warning}</p>
+            </div>
+            <Link href="/admin">
+              <Button variant="primary">
+                <Plus className="h-3.5 w-3.5" />
+                Configure Container Name in Admin
+              </Button>
+            </Link>
+          </Card>
         ) : connections && connections.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
             No connections configured for {activeTab}. Configure a connection in Admin to view logs.

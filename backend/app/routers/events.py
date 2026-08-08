@@ -103,18 +103,32 @@ def _fetch_docker_logs(container_name: str, since_sec: int) -> list[str]:
 @router.get("/postgres")
 def get_postgres_events(connId: str, since: float | int | None = None):
     cfg = _get_conn_fields(connId)
-    container_name = cfg.get("containerName") or "wh-postgres"
-    since_sec = int(since / 1000) if (since and since > 10000000000) else int(since or 0)
+    container_name = cfg.get("containerName")
+    if not container_name or not str(container_name).strip():
+        return {
+            "containerName": None,
+            "warning": "No containerName configured for this Postgres connection in Admin panel.",
+            "since": 0,
+            "logs": [],
+        }
 
-    lines = _fetch_docker_logs(container_name, since_sec)
+    since_sec = int(since / 1000) if (since and since > 10000000000) else int(since or 0)
+    lines = _fetch_docker_logs(str(container_name).strip(), since_sec)
     return {"containerName": container_name, "since": since_sec, "logs": lines}
 
 
 @router.get("/localstack")
 def get_localstack_events(connId: str, since: float | int | None = None):
     cfg = _get_conn_fields(connId)
-    container_name = cfg.get("containerName") or "localstack-main"
-    since_sec = int(since / 1000) if (since and since > 10000000000) else int(since or 0)
+    container_name = cfg.get("containerName")
+    if not container_name or not str(container_name).strip():
+        return {
+            "containerName": None,
+            "warning": "No containerName configured for this LocalStack connection in Admin panel.",
+            "since": 0,
+            "logs": [],
+        }
 
-    lines = _fetch_docker_logs(container_name, since_sec)
+    since_sec = int(since / 1000) if (since and since > 10000000000) else int(since or 0)
+    lines = _fetch_docker_logs(str(container_name).strip(), since_sec)
     return {"containerName": container_name, "since": since_sec, "logs": lines}
