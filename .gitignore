@@ -1,0 +1,24 @@
+# python
+__pycache__/
+*.pyc
+backend/venv/
+backend/app/data/connections.json
+
+# node
+frontend/node_modules/
+frontend/.next/
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
+
+# django listener
+listener/*.sqlite3
+
+# runtime (pids/logs from setup.sh, seed venv)
+.run/
+
+# simulation docker compose (local testing targets only, not pushed to remote)
+docker-compose.sim.yml
+docker-compose.override.yml
+
+# editors/OS
+.DS_Store
