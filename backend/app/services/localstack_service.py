@@ -105,3 +105,28 @@ def list_ssm_params(cfg):
         for n in names
         if n in by_name
     ]
+
+
+def create_queue(cfg, queue_name: str):
+    sqs = _session(cfg).client("sqs", endpoint_url=_endpoint(cfg))
+    resp = sqs.create_queue(QueueName=queue_name)
+    return {"name": queue_name, "url": resp.get("QueueUrl")}
+
+
+def create_bucket(cfg, bucket_name: str):
+    s3 = _session(cfg).client("s3", endpoint_url=_endpoint(cfg))
+    region = cfg.get("region", "us-east-1")
+    if region == "us-east-1":
+        s3.create_bucket(Bucket=bucket_name)
+    else:
+        s3.create_bucket(
+            Bucket=bucket_name,
+            CreateBucketConfiguration={"LocationConstraint": region},
+        )
+    return {"name": bucket_name}
+
+
+def create_ssm_param(cfg, name: str, value: str, param_type: str = "String"):
+    ssm = _session(cfg).client("ssm", endpoint_url=_endpoint(cfg))
+    ssm.put_parameter(Name=name, Value=value, Type=param_type, Overwrite=True)
+    return {"name": name, "value": value, "type": param_type}

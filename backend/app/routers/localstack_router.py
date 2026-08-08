@@ -73,3 +73,50 @@ def get_ssm(conn: str | None = None, refresh: bool = False):
         return cache.cached(f"localstack:{conn_id}:ssm", 15, lambda: localstack_service.list_ssm_params(cfg), refresh)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(502, f"could not reach localstack: {exc}") from exc
+
+
+class CreateQueue(BaseModel):
+    queueName: str
+
+
+class CreateBucket(BaseModel):
+    bucketName: str
+
+
+class CreateSsmParam(BaseModel):
+    name: str
+    value: str
+    type: str = "String"
+
+
+@router.post("/queues")
+def create_queue(body: CreateQueue, conn: str | None = None):
+    conn_id, cfg = _resolve(conn)
+    try:
+        res = localstack_service.create_queue(cfg, body.queueName.strip())
+        cache.invalidate_prefix(f"localstack:{conn_id}:queues")
+        return res
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"failed to create SQS queue: {exc}") from exc
+
+
+@router.post("/buckets")
+def create_bucket(body: CreateBucket, conn: str | None = None):
+    conn_id, cfg = _resolve(conn)
+    try:
+        res = localstack_service.create_bucket(cfg, body.bucketName.strip())
+        cache.invalidate_prefix(f"localstack:{conn_id}:buckets")
+        return res
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"failed to create S3 bucket: {exc}") from exc
+
+
+@router.post("/ssm")
+def create_ssm(body: CreateSsmParam, conn: str | None = None):
+    conn_id, cfg = _resolve(conn)
+    try:
+        res = localstack_service.create_ssm_param(cfg, body.name.strip(), body.value, body.type)
+        cache.invalidate_prefix(f"localstack:{conn_id}:ssm")
+        return res
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"failed to create SSM parameter: {exc}") from exc

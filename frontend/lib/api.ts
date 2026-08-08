@@ -110,8 +110,23 @@ export const api = {
       }),
     purgeQueue: (conn: string, name: string) =>
       request<{ purged: boolean }>(`/api/localstack/queues/${name}/purge${q({ conn })}`, { method: "POST" }),
+    createQueue: (conn: string, queueName: string) =>
+      request<{ name: string; url: string }>(`/api/localstack/queues${q({ conn })}`, {
+        method: "POST",
+        body: JSON.stringify({ queueName }),
+      }),
     buckets: (conn: string, refresh = false) => request<S3Bucket[]>(`/api/localstack/buckets${q({ conn, refresh })}`),
+    createBucket: (conn: string, bucketName: string) =>
+      request<{ name: string }>(`/api/localstack/buckets${q({ conn })}`, {
+        method: "POST",
+        body: JSON.stringify({ bucketName }),
+      }),
     ssm: (conn: string, refresh = false) => request<SsmParam[]>(`/api/localstack/ssm${q({ conn, refresh })}`),
+    createSsm: (conn: string, name: string, value: string, type = "String") =>
+      request<{ name: string; value: string; type: string }>(`/api/localstack/ssm${q({ conn })}`, {
+        method: "POST",
+        body: JSON.stringify({ name, value, type }),
+      }),
   },
 
   workflows: {
