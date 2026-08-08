@@ -73,9 +73,9 @@ export default function WorkflowRunPage() {
   useEffect(() => {
     Promise.all([
       api.workflows.get(workflowId),
-      api.workflows.resetRunSession(workflowId).catch(() => null),
+      api.workflows.getRunSession(workflowId).catch(() => null),
     ])
-      .then(([wf]) => {
+      .then(([wf, runSession]) => {
         setWorkflow(wf);
 
         // Pre-fill active version indices & user bodies
@@ -92,9 +92,28 @@ export default function WorkflowRunPage() {
           initialBodies[s.id] = s.versions[selectedIdx]?.body ?? "";
         });
 
+        // Restore sent steps from active run session
+        const initialSent: Record<string, SendMessageResult> = {};
+        if (runSession?.sentStepIds) {
+          runSession.sentStepIds.forEach((sId) => {
+            initialSent[sId] = { messageId: "session-restored", sentAt: runSession.startedAt ?? "" };
+          });
+        }
+
         setActiveVersionIndexByStep(initialIndices);
         setCustomBodyByStep(initialBodies);
-        setSentByStep({});
+        setSentByStep(initialSent);
+
+        // Position stepIndex at first unsent step if run in-progress
+        if (runSession?.sentStepIds && runSession.sentStepIds.length > 0) {
+          const firstUnsentIdx = wf.steps.findIndex((s) => !runSession.sentStepIds.includes(s.id));
+          if (firstUnsentIdx >= 0) {
+            setStepIndex(firstUnsentIdx);
+          } else {
+            setStepIndex(wf.steps.length - 1);
+          }
+        }
+
         setTelemetryKey((k) => k + 1);
         setError(null);
       })
