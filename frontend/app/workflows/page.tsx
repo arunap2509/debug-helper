@@ -22,7 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { SqsQueue, StepDownstream, Workflow, WorkflowStep } from "@/lib/types";
+import { Connection, SqsQueue, StepDownstream, Workflow, WorkflowRunSession, WorkflowStep } from "@/lib/types";
 import { useConnections } from "@/lib/useConnections";
 import { SERVICE_THEME } from "@/lib/theme";
 import { Badge, Button, Card, ErrorBox, JsonBlock, PageHeader, Spinner } from "@/components/ui";
@@ -52,14 +52,27 @@ export default function WorkflowsPage() {
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [runSessions, setRunSessions] = useState<Record<string, WorkflowRunSession>>({});
 
   const load = () => {
     setLoading(true);
     api.workflows
       .list()
-      .then((w) => {
-        setWorkflows(w);
+      .then(async (wfs) => {
+        setWorkflows(wfs);
         setError(null);
+        const sessions: Record<string, WorkflowRunSession> = {};
+        await Promise.all(
+          wfs.map(async (wf) => {
+            try {
+              const sess = await api.workflows.getRunSession(wf.id);
+              if (sess) sessions[wf.id] = sess;
+            } catch {
+              // Ignore
+            }
+          })
+        );
+        setRunSessions(sessions);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
@@ -68,6 +81,19 @@ export default function WorkflowsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  const handleDiscardRunSession = async (workflowId: string) => {
+    try {
+      await api.workflows.deleteRunSession(workflowId);
+      setRunSessions((prev) => {
+        const next = { ...prev };
+        delete next[workflowId];
+        return next;
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const isValidName = newName.trim().length > CONSTANTS.MIN_NAME_LENGTH;
 
@@ -171,7 +197,15 @@ export default function WorkflowsPage() {
       {/* Workflows List */}
       <div className="space-y-4">
         {workflows?.map((wf) => (
-          <WorkflowCard key={wf.id} workflow={wf} onUpdate={handleUpdate} onDelete={() => handleDelete(wf)} />
+          <WorkflowCard
+            key={wf.id}
+            workflow={wf}
+            connections={localstackConnections ?? []}
+            runSession={runSessions[wf.id]}
+            onUpdate={handleUpdate}
+            onDelete={() => handleDelete(wf)}
+            onDiscardRun={() => handleDiscardRunSession(wf.id)}
+          />
         ))}
 
         {!loading && workflows?.length === 0 && (
@@ -186,16 +220,27 @@ export default function WorkflowsPage() {
 
 function WorkflowCard({
   workflow,
+  connections,
+  runSession,
   onUpdate,
   onDelete,
+  onDiscardRun,
 }: {
   workflow: Workflow;
+  connections?: Connection[];
+  runSession?: WorkflowRunSession;
   onUpdate: (wf: Workflow) => void;
   onDelete: () => void;
+  onDiscardRun?: () => void;
 }) {
   const [isWorkflowExpanded, setIsWorkflowExpanded] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingNameText, setEditingNameText] = useState(workflow.name);
+
+  const sentStepCount = runSession?.sentStepIds?.length ?? 0;
+  const isInProgress = Boolean(
+    runSession && sentStepCount > 0 && sentStepCount < workflow.steps.length
+  );
 
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
   const [queues, setQueues] = useState<SqsQueue[] | null>(null);
@@ -283,11 +328,16 @@ function WorkflowCard({
           </div>
         ) : (
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="flex min-w-0 items-center gap-2.5 text-left group">
+            <div className="flex min-w-0 items-center gap-2.5 text-left group flex-wrap">
               <h3 className="font-mono text-base font-bold text-slate-100 group-hover:text-emerald-300 transition-colors truncate">
                 {workflow.name}
               </h3>
               <Badge tone="green">{workflow.steps.length} Steps</Badge>
+              {isInProgress && (
+                <Badge tone="amber">
+                  In-Progress: Step {sentStepCount + 1} of {workflow.steps.length}
+                </Badge>
+              )}
               <ChevronDown
                 className={`h-4 w-4 text-slate-500 transition-transform ${
                   isWorkflowExpanded ? "rotate-180 text-emerald-400" : ""
@@ -311,12 +361,33 @@ function WorkflowCard({
 
         <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
           {workflow.steps.length > 0 && (
-            <Link href={`/workflows/${workflow.id}/run`}>
-              <Button variant="success">
-                <Play className="h-3.5 w-3.5" />
-                Run Workflow
-              </Button>
-            </Link>
+            isInProgress ? (
+              <div className="flex items-center gap-2">
+                <Link href={`/workflows/${workflow.id}/run`}>
+                  <Button variant="primary">
+                    <Play className="h-3.5 w-3.5" />
+                    Resume Run (Step {sentStepCount + 1}/{workflow.steps.length})
+                  </Button>
+                </Link>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDiscardRun?.();
+                  }}
+                  className="rounded-xl border border-rose-900/50 bg-rose-950/40 p-2 text-rose-400 hover:border-rose-700 hover:bg-rose-900/60 transition-colors"
+                  title="Discard In-Progress Run Session"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Link href={`/workflows/${workflow.id}/run`}>
+                <Button variant="success">
+                  <Play className="h-3.5 w-3.5" />
+                  Run Workflow
+                </Button>
+              </Link>
+            )
           )}
 
           <Button variant="danger" onClick={onDelete}>
