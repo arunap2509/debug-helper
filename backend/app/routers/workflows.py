@@ -200,7 +200,7 @@ def send_step(workflow_id: str, step_id: str, body: SendStep):
                 "queueName": queue_name,
                 "messageId": result["messageId"],
                 "md5": result.get("md5"),
-                "body": message_body,
+                "body": result.get("sentBody", message_body),
             },
         )
     except Exception as exc:  # noqa: BLE001

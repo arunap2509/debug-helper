@@ -1,3 +1,5 @@
+import json
+import uuid
 import requests
 import boto3
 
@@ -21,11 +23,39 @@ def ping(cfg):
     resp.raise_for_status()
 
 
+def format_sqs_envelope(body: str) -> str:
+    try:
+        parsed = json.loads(body)
+        if isinstance(parsed, dict) and ("message" in parsed or "Message" in parsed):
+            return body
+        return json.dumps({"message": parsed})
+    except Exception:
+        return json.dumps({"message": body})
+
+
 def send_message(cfg, queue_name: str, body: str):
     sqs = _session(cfg).client("sqs", endpoint_url=_endpoint(cfg))
     queue_url = sqs.get_queue_url(QueueName=queue_name)["QueueUrl"]
-    resp = sqs.send_message(QueueUrl=queue_url, MessageBody=body)
-    return {"messageId": resp["MessageId"]}
+
+    formatted_body = format_sqs_envelope(body)
+    kwargs = {"QueueUrl": queue_url, "MessageBody": formatted_body}
+
+    # FIFO Queue Support: Pass MessageGroupId & MessageDeduplicationId
+    if queue_name.endswith(".fifo"):
+        group_id = "default-group"
+        dedup_id = str(uuid.uuid4())
+        try:
+            parsed = json.loads(body)
+            if isinstance(parsed, dict):
+                group_id = parsed.get("MessageGroupId") or parsed.get("groupId") or group_id
+                dedup_id = parsed.get("MessageDeduplicationId") or parsed.get("deduplicationId") or dedup_id
+        except Exception:
+            pass
+        kwargs["MessageGroupId"] = group_id
+        kwargs["MessageDeduplicationId"] = dedup_id
+
+    resp = sqs.send_message(**kwargs)
+    return {"messageId": resp["MessageId"], "sentBody": formatted_body}
 
 
 def purge_queue(cfg, queue_name: str):
