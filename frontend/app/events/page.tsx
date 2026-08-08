@@ -424,13 +424,26 @@ function EventsPageContent() {
                 }
 
                 // Render JSON log objects (Wiremock / Redis slowlogs)
+                const timestampDisplay =
+                  item.timeFormatted ||
+                  (item.loggedDate ? new Date(item.loggedDate).toLocaleString() : item.startTime ? new Date(item.startTime * 1000).toLocaleString() : "");
+
                 return (
-                  <div key={item.id || idx} className="hover:bg-slate-900/60 p-2 rounded border border-slate-800/80 mb-2 space-y-1">
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span className="font-bold text-cyan-300">{item.action || item.command || item.method}</span>
-                      <span>{item.time || (item.loggedDate ? new Date(item.loggedDate).toLocaleString() : "")}</span>
+                  <div key={item.id || idx} className="hover:bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 mb-2 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2 border-b border-slate-800/60 pb-1.5">
+                      <div className="flex items-center gap-2">
+                        {item.method && <Badge tone={item.method === "GET" ? "blue" : item.method === "POST" ? "green" : "neutral"}>{item.method}</Badge>}
+                        <span className="font-bold text-cyan-300 font-mono">{item.url || item.command || item.action}</span>
+                        {item.status && <Badge tone={item.status < 400 ? "green" : "red"}>HTTP {item.status}</Badge>}
+                      </div>
+                      {timestampDisplay && (
+                        <span className="font-mono text-amber-300 flex items-center gap-1.5 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                          <Clock className="h-3 w-3 text-amber-400" />
+                          {timestampDisplay}
+                        </span>
+                      )}
                     </div>
-                    <pre className="text-[11px] text-slate-200 overflow-x-auto p-2 bg-slate-900/90 rounded border border-slate-800">
+                    <pre className="text-[11px] text-slate-200 overflow-x-auto p-2.5 bg-slate-900/90 rounded-lg border border-slate-800 font-mono">
                       {JSON.stringify(item, null, 2)}
                     </pre>
                   </div>

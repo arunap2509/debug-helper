@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import subprocess
 import time
 from fastapi import APIRouter, HTTPException
@@ -31,16 +32,24 @@ def get_wiremock_events(connId: str, since: float | int | None = None):
 
     results = []
     for req in reqs:
-        logged_date = req.get("loggedDate", 0)
-        if logged_date >= since_ms:
-            req_data = req.get("request", {})
-            resp_data = req.get("response", {})
+        req_data = req.get("request", {})
+        resp_data = req.get("response", {})
+        logged_date = req.get("loggedDate") or req_data.get("loggedDate") or 0
+
+        # If since_ms is passed, filter strictly; otherwise return all requests recorded in Wiremock journal
+        if since_ms == 0 or logged_date >= since_ms or logged_date == 0:
+            time_formatted = ""
+            if logged_date > 0:
+                dt = datetime.fromtimestamp(logged_date / 1000, tz=timezone.utc)
+                time_formatted = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+
             results.append(
                 {
                     "id": req.get("id"),
                     "loggedDate": logged_date,
+                    "timeFormatted": time_formatted,
                     "method": req_data.get("method"),
-                    "url": req_data.get("url"),
+                    "url": req_data.get("url") or req_data.get("absoluteUrl"),
                     "status": resp_data.get("status"),
                     "headers": req_data.get("headers"),
                     "body": req_data.get("body"),
@@ -68,16 +77,23 @@ def get_redis_events(connId: str, since: float | int | None = None):
     for entry in slowlogs:
         if isinstance(entry, dict):
             start_time = entry.get("start_time", 0)
-            if start_time >= since_sec:
+            if since_sec == 0 or start_time >= since_sec:
                 command = entry.get("command", b"")
                 if isinstance(command, bytes):
                     command = command.decode("utf-8", errors="ignore")
                 elif isinstance(command, list):
                     command = " ".join([c.decode("utf-8", errors="ignore") if isinstance(c, bytes) else str(c) for c in command])
+
+                time_formatted = ""
+                if start_time > 0:
+                    dt = datetime.fromtimestamp(start_time, tz=timezone.utc)
+                    time_formatted = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+
                 results.append(
                     {
                         "id": entry.get("id"),
                         "startTime": start_time,
+                        "timeFormatted": time_formatted,
                         "durationUs": entry.get("duration"),
                         "command": str(command),
                     }
@@ -86,7 +102,7 @@ def get_redis_events(connId: str, since: float | int | None = None):
 
 
 def _fetch_docker_logs(container_name: str, since_sec: int) -> list[str]:
-    cmd = ["docker", "logs"]
+    cmd = ["docker", "logs", "--timestamps"]
     if since_sec > 0:
         cmd.extend(["--since", str(since_sec)])
     cmd.append(container_name)
