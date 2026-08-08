@@ -391,15 +391,30 @@ export default function WorkflowRunPage() {
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <Button
-              onClick={() => setStepIndex((i) => Math.min(workflow.steps.length - 1, i + 1))}
-              disabled={stepIndex === workflow.steps.length - 1}
-            >
-              Next Step
-              <ChevronRight className="h-3.5 w-3.5" />
+          {/* Action Controls */}
+          <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+            <Button onClick={() => setStepIndex((i) => Math.max(0, i - 1))} disabled={stepIndex === 0}>
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Previous Step
             </Button>
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setStepIndex((i) => Math.min(workflow.steps.length - 1, i + 1))}
+                disabled={stepIndex === workflow.steps.length - 1}
+              >
+                Next Step
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSend}
+                disabled={sending || !bodyCheck.valid || !currentBody.trim()}
+              >
+                {sending ? <Spinner /> : <Send className="h-3.5 w-3.5" />}
+                Send to {step.queueName}
+              </Button>
+            </div>
           </div>
         </Card>
       )}
