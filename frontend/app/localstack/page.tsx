@@ -603,14 +603,19 @@ function QueueCard({
   onLabelSaved: (label: string) => void;
   onPurged: () => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(queue.label ?? queue.name);
+  const [label, setLabel] = useState(queue.label);
+  const [syncedLabel, setSyncedLabel] = useState(queue.label);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
 
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [confirmPurge, setConfirmPurge] = useState(false);
   const [purging, setPurging] = useState(false);
+
+  if (queue.label !== syncedLabel) {
+    setSyncedLabel(queue.label);
+    setLabel(queue.label);
+  }
 
   const saveLabel = async () => {
     const next = label.trim() || queue.name;
@@ -630,7 +635,7 @@ function QueueCard({
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(queue.url);
     setCopiedUrl(true);
-    setTimeout(() => setCopiedUrl(false), CONSTANTS.COPIED_TOAST_DURATION_MS);
+    setTimeout(() => setCopiedUrl(false), 1500);
   };
 
   const handlePurgeConfirmed = async () => {
@@ -644,77 +649,107 @@ function QueueCard({
     }
   };
 
+  const hasCustomAlias = queue.label && queue.label !== queue.name;
+
   return (
-    <Card className="p-5 border-slate-800/90 bg-slate-900/50 backdrop-blur-xl space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
-            <Inbox className="h-4 w-4" />
+    <Card className="group flex flex-col justify-between p-5 border-slate-800/90 bg-slate-900/60 backdrop-blur-xl hover:border-slate-700 transition-all duration-200 shadow-xl shadow-black/40 space-y-4">
+      <div className="space-y-4">
+        {/* Header with Single Editable Name Input */}
+        <div className="border-b border-slate-800/80 pb-3">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+              <Pencil className="h-3 w-3 text-amber-400" />
+              Queue Alias / Name
+            </span>
+            {saving && (
+              <span className="flex items-center gap-1 text-[11px] text-amber-400">
+                <Spinner /> Saving...
+              </span>
+            )}
+            {saved && (
+              <span className="flex items-center gap-1 text-[11px] text-emerald-400">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Saved
+              </span>
+            )}
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-mono text-sm font-semibold text-slate-100">{queue.name}</h3>
-              {queue.hasRedrivePolicy && <Badge tone="amber">DLQ Configured</Badge>}
-            </div>
-            <p className="text-[11px] font-mono text-slate-500 truncate max-w-xs">{queue.url}</p>
-          </div>
-        </div>
 
-        <button
-          onClick={handleCopyUrl}
-          className="flex items-center gap-1 rounded-lg bg-slate-950 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 border border-slate-800 transition-all"
-        >
-          {copiedUrl ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-          {copiedUrl ? "Copied" : "Copy URL"}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Visible Messages</span>
-          <div className="text-xl font-bold font-mono text-emerald-400 mt-1">{queue.visible}</div>
-        </div>
-
-        <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">In-Flight</span>
-          <div className="text-xl font-bold font-mono text-amber-400 mt-1">{queue.inFlight}</div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between pt-1">
-        {isEditing ? (
-          <div className="flex items-center gap-2 flex-1 mr-3">
+          <div className="relative flex items-center">
             <input
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 text-xs text-slate-200 focus:border-amber-500 focus:outline-none"
-              autoFocus
+              onBlur={saveLabel}
+              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+              placeholder="Queue Name / Display Label"
+              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm font-semibold text-slate-100 hover:border-slate-700 focus:border-amber-500 focus:bg-slate-950 focus:outline-none transition-all pr-8"
             />
-            <Button
-              variant="default"
-              onClick={() => {
-                saveLabel();
-                setIsEditing(false);
-              }}
-              disabled={saving}
-            >
-              {saving ? <Spinner /> : "Save"}
-            </Button>
+            <Pencil className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
           </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Display Label:</span>
-            <span className="text-xs font-semibold text-slate-200">{label}</span>
-            <button onClick={() => setIsEditing(true)} className="text-slate-500 hover:text-slate-300">
-              <Pencil className="h-3 w-3" />
-            </button>
-            {saved && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
-          </div>
-        )}
 
-        <Button variant="default" onClick={() => setConfirmPurge(true)}>
-          <Trash2 className="h-3.5 w-3.5" />
+          {hasCustomAlias && (
+            <div className="mt-1.5 text-[11px] font-mono text-slate-500">
+              System Queue: <span className="text-slate-400">{queue.name}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Clear Queue URL Box with Copy Button */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-mono text-slate-400 uppercase tracking-wider text-[10px]">Queue URL</span>
+            <button
+              type="button"
+              onClick={handleCopyUrl}
+              className="flex items-center gap-1 text-[10px] text-amber-400 hover:text-amber-300 transition-colors font-medium"
+            >
+              {copiedUrl ? (
+                <Check className="h-3.5 w-3.5 text-emerald-400" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+              {copiedUrl ? "Copied URL!" : "Copy URL"}
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 font-mono text-xs text-amber-300/90 break-all select-all font-medium leading-relaxed">
+            {queue.url}
+          </div>
+        </div>
+
+        {/* Queue Metrics Badges */}
+        <div className="flex flex-wrap gap-2">
+          <span
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${
+              queue.visible > 0
+                ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                : "bg-slate-950 text-slate-400 border border-slate-800"
+            }`}
+          >
+            <span className="font-mono">{queue.visible}</span> visible
+          </span>
+
+          <span
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${
+              queue.inFlight > 0
+                ? "bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                : "bg-slate-950 text-slate-400 border border-slate-800"
+            }`}
+          >
+            <span className="font-mono">{queue.inFlight}</span> in flight
+          </span>
+
+          {queue.hasRedrivePolicy && (
+            <span className="flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300 border border-emerald-500/30">
+              <Check className="h-3 w-3" /> DLQ Wired
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Card Actions Footer */}
+      <div className="border-t border-slate-800/80 pt-3 flex items-center justify-end">
+        <Button variant="danger" onClick={() => setConfirmPurge(true)} disabled={purging}>
+          {purging ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
           Purge Queue
         </Button>
       </div>
@@ -729,14 +764,13 @@ function QueueCard({
               </div>
               <div>
                 <h3 className="text-base font-semibold text-slate-100">{CONSTANTS.LABELS.PURGE_MODAL_TITLE}</h3>
-                <p className="text-xs text-slate-400">Delete all sitting messages</p>
+                <p className="text-xs text-slate-400">All visible and in-flight messages will be deleted</p>
               </div>
             </div>
 
             <p className="text-xs leading-relaxed text-slate-300">
-              Are you sure you want to purge queue &quot;
-              <strong className="text-slate-100 font-mono">{queue.name}</strong>&quot;? All pending messages will be
-              permanently deleted.
+              Are you sure you want to purge all messages in queue &quot;
+              <strong className="text-slate-100 font-mono">{queue.name}</strong>&quot;? This action cannot be undone.
             </p>
 
             <div className="flex items-center justify-end gap-3 pt-2">
