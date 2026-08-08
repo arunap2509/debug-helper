@@ -84,9 +84,12 @@ export default function WorkflowRunPage() {
           initialBodies[s.id] = s.versions[selectedIdx]?.body ?? "";
         });
 
-        // Restore sent steps from active run session
+        // Restore sent steps from active run session, but only if the run is still in progress
         const initialSent: Record<string, SendMessageResult> = {};
-        if (runSession?.sentStepIds) {
+        const allDone = runSession?.sentStepIds?.length === wf.steps.length && wf.steps.length > 0;
+        if (allDone) {
+          api.workflows.resetRunSession(wf.id).catch(() => {});
+        } else if (runSession?.sentStepIds) {
           runSession.sentStepIds.forEach((sId) => {
             initialSent[sId] = { messageId: "session-restored", sentAt: runSession.startedAt ?? "" };
           });
@@ -97,7 +100,7 @@ export default function WorkflowRunPage() {
         setSentByStep(initialSent);
 
         // Position stepIndex at first unsent step if run in-progress
-        if (runSession?.sentStepIds && runSession.sentStepIds.length > 0) {
+        if (!allDone && runSession?.sentStepIds && runSession.sentStepIds.length > 0) {
           const firstUnsentIdx = wf.steps.findIndex((s) => !runSession.sentStepIds.includes(s.id));
           if (firstUnsentIdx >= 0) {
             setStepIndex(firstUnsentIdx);
