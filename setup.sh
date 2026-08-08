@@ -3,7 +3,7 @@
 #   1. dummy docker services (postgres, redis, wiremock, localstack, listener)
 #   2. seeds a few demo redis keys
 #   3. python backend (FastAPI) on :8000
-#   4. Next.js frontend on :3000, installing Node via nvm first if missing
+#   4. Next.js frontend on :3010, installing Node via nvm first if missing
 #
 # Safe to re-run — it restarts the backend/frontend and reuses existing
 # docker volumes, so data you've poked at survives between runs.
@@ -14,6 +14,9 @@ cd "$ROOT_DIR"
 
 RUN_DIR="$ROOT_DIR/.run"
 mkdir -p "$RUN_DIR"
+
+BACKEND_PORT="${BACKEND_PORT:-8010}"
+FRONTEND_PORT="${FRONTEND_PORT:-3010}"
 
 log()  { printf "\033[1;34m[setup]\033[0m %s\n" "$1"; }
 warn() { printf "\033[1;33m[setup]\033[0m %s\n" "$1"; }
@@ -168,19 +171,19 @@ fi
 backend/venv/bin/pip install --quiet -r backend/requirements.txt
 
 restart_if_running "$RUN_DIR/backend.pid"
-stop_listeners_on_port 8000
-log "starting backend on http://localhost:8000 ..."
+stop_listeners_on_port "$BACKEND_PORT"
+log "starting backend on http://localhost:$BACKEND_PORT ..."
 (
   cd backend
-  nohup ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload \
+  nohup ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" --reload \
     > "$RUN_DIR/backend.log" 2>&1 &
   echo $! > "$RUN_DIR/backend.pid"
 )
 assert_pid_alive "$RUN_DIR/backend.pid" "backend" "$RUN_DIR/backend.log"
-if ! wait_for_http "backend" "http://localhost:8000/api/health" 30; then
+if ! wait_for_http "backend" "http://localhost:$BACKEND_PORT/api/health" 30; then
   warn "backend did not answer health checks; recent log output:"
   tail -n 40 "$RUN_DIR/backend.log" >&2 || true
-  die "backend failed to become ready on http://localhost:8000"
+  die "backend failed to become ready on http://localhost:$BACKEND_PORT"
 fi
 
 # ---------------------------------------------------------------------------
@@ -192,24 +195,25 @@ if [ ! -d frontend/node_modules ] || ! (cd frontend && node -e "require('@tailwi
 fi
 
 restart_if_running "$RUN_DIR/frontend.pid"
-stop_listeners_on_port 3000
-log "starting frontend on http://localhost:3000 ..."
+stop_listeners_on_port "$FRONTEND_PORT"
+log "starting frontend on http://localhost:$FRONTEND_PORT ..."
 (
   cd frontend
-  nohup npm run dev -- -p 3000 > "$RUN_DIR/frontend.log" 2>&1 &
+  NEXT_PUBLIC_API_BASE="http://localhost:$BACKEND_PORT" \
+    nohup npm run dev -- -p "$FRONTEND_PORT" > "$RUN_DIR/frontend.log" 2>&1 &
   echo $! > "$RUN_DIR/frontend.pid"
 )
 assert_pid_alive "$RUN_DIR/frontend.pid" "frontend" "$RUN_DIR/frontend.log"
-if ! wait_for_http "frontend" "http://localhost:3000" 45; then
+if ! wait_for_http "frontend" "http://localhost:$FRONTEND_PORT" 45; then
   warn "frontend did not answer HTTP requests; recent log output:"
   tail -n 60 "$RUN_DIR/frontend.log" >&2 || true
-  die "frontend failed to become ready on http://localhost:3000"
+  die "frontend failed to become ready on http://localhost:$FRONTEND_PORT"
 fi
 
 sleep 3
 log "----------------------------------------------------------------------"
-log "  UI          http://localhost:3000"
-log "  API         http://localhost:8000  (interactive docs at /docs)"
+log "  UI          http://localhost:$FRONTEND_PORT"
+log "  API         http://localhost:$BACKEND_PORT  (interactive docs at /docs)"
 log "  App Redis   localhost:6391   (internal cache & workflow storage)"
 log "----------------------------------------------------------------------"
 log "Logs: .run/backend.log, .run/frontend.log, or 'docker compose logs -f'"
