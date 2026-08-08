@@ -13,6 +13,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Search,
   Star,
   Trash2,
   Workflow as WorkflowIcon,
@@ -340,19 +341,12 @@ function WorkflowCard({
               {/* Insert at start button (before Step 1) */}
               {addingStepIndex === 0 ? (
                 <div className="flex items-center gap-2 rounded-xl border border-dashed border-emerald-500/40 bg-slate-950 p-2">
-                  <select
+                  <SearchableQueueSelect
+                    queues={queues}
                     value={newQueue}
-                    onChange={(e) => setNewQueue(e.target.value)}
+                    onChange={setNewQueue}
                     onFocus={ensureQueuesLoaded}
-                    className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none"
-                  >
-                    {!queues && <option>loading queues...</option>}
-                    {queues?.map((q) => (
-                      <option key={q.name} value={q.name}>
-                        {q.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                   <Button variant="primary" onClick={() => handleAddStep(0)} disabled={busy || !newQueue}>
                     Insert at Start
                   </Button>
@@ -378,6 +372,7 @@ function WorkflowCard({
                   <StepChip
                     step={step}
                     index={i}
+                    queues={queues}
                     expanded={expandedStep === step.id}
                     busy={busy}
                     onToggle={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
@@ -387,19 +382,12 @@ function WorkflowCard({
                   {/* Intermediate insert button between steps */}
                   {addingStepIndex === i + 1 ? (
                     <div className="flex items-center gap-2 rounded-xl border border-dashed border-emerald-500/40 bg-slate-950 p-2">
-                      <select
+                      <SearchableQueueSelect
+                        queues={queues}
                         value={newQueue}
-                        onChange={(e) => setNewQueue(e.target.value)}
+                        onChange={setNewQueue}
                         onFocus={ensureQueuesLoaded}
-                        className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none"
-                      >
-                        {!queues && <option>loading queues...</option>}
-                        {queues?.map((q) => (
-                          <option key={q.name} value={q.name}>
-                            {q.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                       <Button variant="primary" onClick={() => handleAddStep(i + 1)} disabled={busy || !newQueue}>
                         Insert
                       </Button>
@@ -423,19 +411,12 @@ function WorkflowCard({
               {/* Append to end container */}
               {addingStepIndex === -1 || (workflow.steps.length === 0 && addingStepIndex !== null) ? (
                 <div className="flex items-center gap-2 rounded-xl border border-dashed border-emerald-500/40 bg-slate-950 p-2">
-                  <select
+                  <SearchableQueueSelect
+                    queues={queues}
                     value={newQueue}
-                    onChange={(e) => setNewQueue(e.target.value)}
+                    onChange={setNewQueue}
                     onFocus={ensureQueuesLoaded}
-                    className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none"
-                  >
-                    {!queues && <option>loading queues...</option>}
-                    {queues?.map((q) => (
-                      <option key={q.name} value={q.name}>
-                        {q.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                   <Button variant="primary" onClick={() => handleAddStep(-1)} disabled={busy || !newQueue}>
                     Add Step
                   </Button>
@@ -481,9 +462,125 @@ function WorkflowCard({
   );
 }
 
+function SearchableQueueSelect({
+  queues,
+  value,
+  onChange,
+  onFocus,
+  disabled,
+}: {
+  queues: SqsQueue[] | null;
+  value: string;
+  onChange: (queueName: string) => void;
+  onFocus?: () => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const selectedQueue = queues?.find((q) => q.name === value);
+  const displayTitle = selectedQueue
+    ? selectedQueue.label && selectedQueue.label !== selectedQueue.name
+      ? `${selectedQueue.label} (${selectedQueue.name})`
+      : selectedQueue.name
+    : value || "Select a queue...";
+
+  const filteredQueues = (queues ?? []).filter((q) => {
+    const qry = search.trim().toLowerCase();
+    if (!qry) return true;
+    return (
+      q.name.toLowerCase().includes(qry) ||
+      (q.label && q.label.toLowerCase().includes(qry))
+    );
+  });
+
+  return (
+    <div className="relative min-w-[240px]">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (!isOpen && onFocus) onFocus();
+          setIsOpen((prev) => !prev);
+        }}
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-100 hover:border-slate-700 focus:border-emerald-500 focus:outline-none transition-all font-mono"
+      >
+        <span className="truncate">{displayTitle}</span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 top-full z-50 mt-1.5 w-72 rounded-xl border border-slate-800 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl animate-fade-in space-y-1.5">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search queue label or name..."
+              className="w-full rounded-lg border border-slate-800 bg-slate-950 pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none font-mono"
+              autoFocus
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-48 overflow-y-auto space-y-0.5 custom-scrollbar">
+            {!queues && (
+              <div className="flex items-center gap-2 p-2 text-xs text-slate-500">
+                <Spinner />
+                <span>Loading queues...</span>
+              </div>
+            )}
+
+            {queues && filteredQueues.length === 0 && (
+              <div className="p-2 text-xs text-slate-500 text-center">No matching queues found</div>
+            )}
+
+            {filteredQueues.map((q) => {
+              const isSelected = q.name === value;
+              const hasAlias = q.label && q.label !== q.name;
+              return (
+                <button
+                  key={q.name}
+                  type="button"
+                  onClick={() => {
+                    onChange(q.name);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
+                    isSelected
+                      ? "bg-emerald-500/20 text-emerald-300 font-semibold"
+                      : "text-slate-300 hover:bg-slate-800/80 hover:text-slate-100"
+                  }`}
+                >
+                  <div className="truncate">
+                    <div className="font-semibold text-slate-100">{q.label ?? q.name}</div>
+                    {hasAlias && <div className="text-[10px] font-mono text-slate-500">{q.name}</div>}
+                  </div>
+                  {isSelected && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0 ml-2" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StepChip({
   step,
   index,
+  queues,
   expanded,
   busy,
   onToggle,
@@ -491,11 +588,15 @@ function StepChip({
 }: {
   step: WorkflowStep;
   index: number;
+  queues?: SqsQueue[] | null;
   expanded: boolean;
   busy: boolean;
   onToggle: () => void;
   onRemove: () => void;
 }) {
+  const qObj = queues?.find((q) => q.name === step.queueName);
+  const displayTitle = qObj?.label && qObj.label !== step.queueName ? `${qObj.label} (${step.queueName})` : step.queueName;
+
   return (
     <div
       className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 text-xs transition-all ${
@@ -508,7 +609,7 @@ function StepChip({
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 font-bold font-mono text-[10px] text-emerald-400">
           {index + 1}
         </span>
-        <span className="font-mono text-xs font-semibold text-slate-100">{step.queueName}</span>
+        <span className="font-mono text-xs font-semibold text-slate-100">{displayTitle}</span>
         <Badge tone={step.versions.length > 0 ? "green" : "neutral"}>{step.versions.length}/5 msgs</Badge>
       </button>
 
@@ -825,18 +926,21 @@ function DownstreamConnectionSelect({
 }) {
   const { connections } = useConnections(type);
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none"
-    >
-      <option value="">disabled</option>
-      {(connections ?? []).map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.label}
-        </option>
-      ))}
-    </select>
+    <div className="relative inline-flex items-center">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none rounded-xl border border-slate-800 bg-slate-950 pl-3 pr-8 py-1.5 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none transition-all cursor-pointer"
+      >
+        <option value="">disabled</option>
+        {(connections ?? []).map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+    </div>
   );
 }
 
@@ -908,18 +1012,21 @@ function StepDownstreamPanel({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <DownstreamConnectionSelect value={wiremockConn} onChange={setWiremockConn} type="wiremock" />
-          <select
-            value={wiremockMethod ?? "GET"}
-            onChange={(e) => setWiremockMethod(e.target.value)}
-            disabled={!wiremockConn}
-            className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none disabled:opacity-40"
-          >
-            {WIREMOCK_METHODS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+          <div className="relative inline-flex items-center">
+            <select
+              value={wiremockMethod ?? "GET"}
+              onChange={(e) => setWiremockMethod(e.target.value)}
+              disabled={!wiremockConn}
+              className="appearance-none rounded-xl border border-slate-800 bg-slate-950 pl-3 pr-8 py-1.5 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none disabled:opacity-40 cursor-pointer"
+            >
+              {WIREMOCK_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          </div>
           <input
             value={wiremockPath}
             onChange={(e) => setWiremockPath(e.target.value)}
