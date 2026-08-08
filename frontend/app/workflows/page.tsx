@@ -449,11 +449,6 @@ function WorkflowCard({
                 step={workflow.steps.find((s) => s.id === expandedStep)!}
                 onUpdate={onUpdate}
               />
-              <StepDownstreamPanel
-                workflowId={workflow.id}
-                step={workflow.steps.find((s) => s.id === expandedStep)!}
-                onUpdate={onUpdate}
-              />
             </div>
           )}
         </div>
@@ -506,7 +501,7 @@ function SearchableQueueSelect({
   });
 
   return (
-    <div ref={containerRef} className="relative min-w-[240px]">
+    <div ref={containerRef} className="relative min-w-[320px] sm:min-w-[380px]">
       <button
         type="button"
         disabled={disabled}
@@ -521,14 +516,14 @@ function SearchableQueueSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 w-72 rounded-xl border border-slate-800 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl animate-fade-in space-y-1.5">
+        <div className="absolute left-0 top-full z-50 mt-1.5 w-[440px] max-w-[90vw] rounded-xl border border-slate-800 bg-slate-900 p-2.5 shadow-2xl backdrop-blur-xl animate-fade-in space-y-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search queue label or name..."
+              placeholder="Search queue label, name, or URL..."
               className="w-full rounded-lg border border-slate-800 bg-slate-950 pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none font-mono"
               autoFocus
             />
@@ -543,7 +538,7 @@ function SearchableQueueSelect({
             )}
           </div>
 
-          <div className="max-h-48 overflow-y-auto space-y-0.5 custom-scrollbar">
+          <div className="max-h-56 overflow-y-auto space-y-1 custom-scrollbar">
             {!queues && (
               <div className="flex items-center gap-2 p-2 text-xs text-slate-500">
                 <Spinner />
@@ -567,17 +562,18 @@ function SearchableQueueSelect({
                     setIsOpen(false);
                     setSearch("");
                   }}
-                  className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors ${
                     isSelected
                       ? "bg-emerald-500/20 text-emerald-300 font-semibold"
                       : "text-slate-300 hover:bg-slate-800/80 hover:text-slate-100"
                   }`}
                 >
-                  <div className="truncate">
-                    <div className="font-semibold text-slate-100">{q.label ?? q.name}</div>
-                    {hasAlias && <div className="text-[10px] font-mono text-slate-500">{q.name}</div>}
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="font-semibold text-slate-100 truncate">{q.label ?? q.name}</div>
+                    {hasAlias && <div className="text-[10px] font-mono text-slate-500 truncate">Queue: {q.name}</div>}
+                    <div className="text-[10px] font-mono text-slate-500 truncate">{q.url}</div>
                   </div>
-                  {isSelected && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0 ml-2" />}
+                  {isSelected && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0 ml-2.5" />}
                 </button>
               );
             })}
