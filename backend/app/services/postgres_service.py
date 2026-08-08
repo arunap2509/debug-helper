@@ -119,21 +119,3 @@ def execute_sql(cfg, sql: str, limit: int = 5):
         return rows
 
 
-def get_recent_activity(cfg):
-    try:
-        with _connect(cfg) as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                "SELECT pid, usename, datname, query, state, "
-                "query_start::text AS query_start, "
-                "round(extract(epoch from (now() - query_start)) * 1000) AS duration_ms "
-                "FROM pg_stat_activity WHERE state IS NOT NULL AND query != '' "
-                "AND query NOT LIKE '%pg_stat_activity%' "
-                "ORDER BY query_start DESC LIMIT 20"
-            )
-            return [dict(r) for r in cur.fetchall()]
-    except Exception:
-        return []
-
-
-
-

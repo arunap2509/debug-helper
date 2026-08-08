@@ -1,19 +1,15 @@
 """Workflow Run Session Store:
 
-Persists active workflow run sessions (startedAt timestamp set on FIRST message send,
-cached variable snapshots, runId, sent steps) and associated cross-service telemetry
-event streams in Redis under 'app:workflow_run:{workflow_id}'.
+Persists active workflow run sessions (startedAt timestamp set on first
+message send, cached variable snapshots, runId, which steps have been
+sent) in Redis under 'app:workflow_run:{workflow_id}'. Used purely to
+drive run-page progress (which step you're on, what's already been sent)
+— no cross-service telemetry here.
 """
 import uuid
 from datetime import datetime, timezone
 
 from . import store
-
-MAX_LOGS_PER_RUN = 150
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def get_active_run(workflow_id: str) -> dict:
@@ -43,16 +39,12 @@ def reset_run(workflow_id: str) -> dict:
         "status": "idle",
     }
     store.set_json(key, run)
-    telemetry_key = f"app:workflow_telemetry:{workflow_id}"
-    store.set_json(telemetry_key, [])
     return run
 
 
 def delete_active_run(workflow_id: str) -> dict:
     key = f"app:workflow_run:{workflow_id}"
-    telemetry_key = f"app:workflow_telemetry:{workflow_id}"
     store.set_json(key, None)
-    store.set_json(telemetry_key, [])
     return {"deleted": True}
 
 
@@ -60,7 +52,7 @@ def record_step_sent(workflow_id: str, step_id: str, variables: dict | None = No
     run = get_active_run(workflow_id)
     key = f"app:workflow_run:{workflow_id}"
 
-    # Initialize startedAt & startedAtMs ON FIRST MESSAGE SENT
+    # Initialize startedAt & startedAtMs on first message sent
     if not run.get("startedAt"):
         dt = datetime.now(timezone.utc)
         run["startedAt"] = dt.isoformat()
@@ -75,33 +67,3 @@ def record_step_sent(workflow_id: str, step_id: str, variables: dict | None = No
 
     store.set_json(key, run)
     return run
-
-
-def record_telemetry_event(workflow_id: str, service: str, action: str, details: dict) -> dict:
-    run = get_active_run(workflow_id)
-    telemetry_key = f"app:workflow_telemetry:{workflow_id}"
-    logs = store.get_json(telemetry_key, []) or []
-
-    event = {
-        "id": f"{service}-{uuid.uuid4().hex[:8]}",
-        "runId": run.get("runId"),
-        "service": service,
-        "action": action,
-        "time": _now(),
-        **details,
-    }
-
-    logs.append(event)
-    if len(logs) > MAX_LOGS_PER_RUN:
-        logs = logs[-MAX_LOGS_PER_RUN:]
-
-    store.set_json(telemetry_key, logs)
-    return event
-
-
-def get_telemetry_events(workflow_id: str) -> list[dict]:
-    run = get_active_run(workflow_id)
-    active_run_id = run.get("runId")
-    telemetry_key = f"app:workflow_telemetry:{workflow_id}"
-    logs = store.get_json(telemetry_key, []) or []
-    return [e for e in logs if e.get("runId") == active_run_id]

@@ -12,12 +12,10 @@ import type {
   SqsQueue,
   SsmParam,
   StatusEntry,
-  StepDownstream,
   WiremockMapping,
   WiremockTryResult,
   Workflow,
   WorkflowRunSession,
-  WorkflowTelemetry,
 } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
@@ -175,12 +173,6 @@ export const api = {
         body: JSON.stringify({ versionId }),
       }),
 
-    updateStepDownstream: (id: string, stepId: string, downstream: StepDownstream) =>
-      request<Workflow>(`/api/workflows/${id}/steps/${stepId}/downstream`, {
-        method: "PUT",
-        body: JSON.stringify(downstream),
-      }),
-
     send: (id: string, stepId: string, versionId?: string, overrideBody?: string) =>
       request<SendMessageResult>(`/api/workflows/${id}/steps/${stepId}/send`, {
         method: "POST",
@@ -194,12 +186,19 @@ export const api = {
       request<WorkflowRunSession>(`/api/workflows/${id}/run-session/reset`, { method: "POST" }),
     deleteRunSession: (id: string) =>
       request<{ deleted: boolean }>(`/api/workflows/${id}/run-session`, { method: "DELETE" }),
-    getTelemetry: async (id: string): Promise<WorkflowTelemetry | null> => {
-      try {
-        return await request<WorkflowTelemetry>(`/api/workflows/${id}/telemetry`);
-      } catch {
-        return null;
-      }
-    },
+  },
+  events: {
+    wiremock: (connId: string, since?: number) =>
+      request<any[]>(`/api/events/wiremock?connId=${encodeURIComponent(connId)}${since ? `&since=${since}` : ""}`),
+    redis: (connId: string, since?: number) =>
+      request<any[]>(`/api/events/redis?connId=${encodeURIComponent(connId)}${since ? `&since=${since}` : ""}`),
+    postgres: (connId: string, since?: number) =>
+      request<{ containerName: string; since: number; logs: string[] }>(
+        `/api/events/postgres?connId=${encodeURIComponent(connId)}${since ? `&since=${since}` : ""}`
+      ),
+    localstack: (connId: string, since?: number) =>
+      request<{ containerName: string; since: number; logs: string[] }>(
+        `/api/events/localstack?connId=${encodeURIComponent(connId)}${since ? `&since=${since}` : ""}`
+      ),
   },
 };

@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldCheck, Workflow, type LucideIcon } from "lucide-react";
+import { Activity, ShieldCheck, Workflow, type LucideIcon } from "lucide-react";
 import { SERVICE_THEME } from "@/lib/theme";
 
 type NavLink = { href: string; label: string; icon: LucideIcon; activeNav: string };
 
 const TOP: NavLink[] = [
   { href: "/workflows", label: "Workflows", icon: Workflow, activeNav: "bg-emerald-500/15 text-emerald-300" },
+  { href: "/events", label: "Events", icon: Activity, activeNav: "bg-cyan-500/15 text-cyan-300" },
 ];
 
 const SERVICES: NavLink[] = [

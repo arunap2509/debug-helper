@@ -8,8 +8,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Database,
-  Globe,
   Pencil,
   Play,
   Plus,
@@ -19,17 +17,14 @@ import {
   Trash2,
   Workflow as WorkflowIcon,
   X,
-  Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { Connection, SqsQueue, StepDownstream, Workflow, WorkflowRunSession, WorkflowStep } from "@/lib/types";
+import { Connection, SqsQueue, Workflow, WorkflowRunSession, WorkflowStep } from "@/lib/types";
 import { useConnections } from "@/lib/useConnections";
 import { SERVICE_THEME } from "@/lib/theme";
 import { Badge, Button, Card, ErrorBox, JsonBlock, PageHeader, Spinner } from "@/components/ui";
 import ConnectionPicker from "@/components/ConnectionPicker";
-import { JsonEditor, jsonValidity, SqlEditor } from "@/components/CodeEditor";
-
-const WIREMOCK_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+import { JsonEditor, jsonValidity } from "@/components/CodeEditor";
 
 const CONSTANTS = {
   SERVICE_TYPE: "localstack" as const,
@@ -984,178 +979,6 @@ function StepVersionsPanel({
       {atCap && (
         <div className="text-[11px] text-slate-500">5/5 versions configured. Delete a version to add another.</div>
       )}
-    </div>
-  );
-}
-
-function DownstreamConnectionSelect({
-  value,
-  onChange,
-  type,
-}: {
-  value: string;
-  onChange: (id: string) => void;
-  type: "wiremock" | "postgres" | "redis";
-}) {
-  const { connections } = useConnections(type);
-  return (
-    <div className="relative inline-flex items-center">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="appearance-none rounded-xl border border-slate-800 bg-slate-950 pl-3 pr-8 py-1.5 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none transition-all cursor-pointer"
-      >
-        <option value="">disabled</option>
-        {(connections ?? []).map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-    </div>
-  );
-}
-
-function StepDownstreamPanel({
-  workflowId,
-  step,
-  onUpdate,
-}: {
-  workflowId: string;
-  step: WorkflowStep;
-  onUpdate: (wf: Workflow) => void;
-}) {
-  const d = step.downstream ?? {};
-  const [wiremockConn, setWiremockConn] = useState(d.wiremockConn ?? "");
-  const [wiremockMethod, setWiremockMethod] = useState(d.wiremockMethod ?? "GET");
-  const [wiremockPath, setWiremockPath] = useState(d.wiremockPath ?? "");
-  const [postgresConn, setPostgresConn] = useState(d.postgresConn ?? "");
-  const [postgresSql, setPostgresSql] = useState(d.postgresSql ?? "");
-  const [redisConn, setRedisConn] = useState(d.redisConn ?? "");
-  const [redisKey, setRedisKey] = useState(d.redisKey ?? "");
-  const [redisValue, setRedisValue] = useState(d.redisValue ?? "");
-
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const payload: StepDownstream = {
-        wiremockConn: wiremockConn || null,
-        wiremockMethod,
-        wiremockPath: wiremockPath || null,
-        postgresConn: postgresConn || null,
-        postgresSql: postgresSql || null,
-        redisConn: redisConn || null,
-        redisAction: "SET",
-        redisKey: redisKey || null,
-        redisValue: redisValue || null,
-      };
-      const updated = await api.workflows.updateStepDownstream(workflowId, step.id, payload);
-      onUpdate(updated);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1500);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-4">
-      <div className="flex items-center justify-between text-xs">
-        <div className="font-semibold text-slate-200">
-          Downstream triggers for <span className="font-mono text-emerald-400">{step.queueName}</span>
-        </div>
-        <div className="text-[11px] text-slate-500">
-          Fired for real, right after this step&apos;s SQS send succeeds — each is logged as its own telemetry event.
-        </div>
-      </div>
-
-      {/* Wiremock */}
-      <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-3 space-y-2">
-        <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
-          <Globe className="h-3.5 w-3.5" />
-          Wiremock call
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <DownstreamConnectionSelect value={wiremockConn} onChange={setWiremockConn} type="wiremock" />
-          <div className="relative inline-flex items-center">
-            <select
-              value={wiremockMethod ?? "GET"}
-              onChange={(e) => setWiremockMethod(e.target.value)}
-              disabled={!wiremockConn}
-              className="appearance-none rounded-xl border border-slate-800 bg-slate-950 pl-3 pr-8 py-1.5 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none disabled:opacity-40 cursor-pointer"
-            >
-              {WIREMOCK_METHODS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          </div>
-          <input
-            value={wiremockPath}
-            onChange={(e) => setWiremockPath(e.target.value)}
-            disabled={!wiremockConn}
-            placeholder="/api/customers/1"
-            className="min-w-[200px] flex-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-40"
-          />
-        </div>
-      </div>
-
-      {/* Postgres */}
-      <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-3 space-y-2">
-        <div className="flex items-center gap-2 text-xs font-semibold text-sky-300">
-          <Database className="h-3.5 w-3.5" />
-          Postgres query
-        </div>
-        <DownstreamConnectionSelect value={postgresConn} onChange={setPostgresConn} type="postgres" />
-        {postgresConn && (
-          <SqlEditor value={postgresSql} onChange={setPostgresSql} height="80px" placeholder="SELECT ..." />
-        )}
-      </div>
-
-      {/* Redis */}
-      <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-3 space-y-2">
-        <div className="flex items-center gap-2 text-xs font-semibold text-rose-300">
-          <Zap className="h-3.5 w-3.5" />
-          Redis SET
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <DownstreamConnectionSelect value={redisConn} onChange={setRedisConn} type="redis" />
-          <input
-            value={redisKey}
-            onChange={(e) => setRedisKey(e.target.value)}
-            disabled={!redisConn}
-            placeholder="key, e.g. workflow:last-order"
-            className="min-w-[180px] rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-40"
-          />
-          <input
-            value={redisValue}
-            onChange={(e) => setRedisValue(e.target.value)}
-            disabled={!redisConn}
-            placeholder="value (defaults to the sent message body)"
-            className="min-w-[220px] flex-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-40"
-          />
-        </div>
-      </div>
-
-      {error && <ErrorBox message={error} />}
-
-      <div className="flex items-center justify-end gap-2">
-        {saved && <span className="text-[11px] text-emerald-400">saved</span>}
-        <Button variant="primary" onClick={handleSave} disabled={saving}>
-          {saving ? <Spinner /> : <Check className="h-3.5 w-3.5" />}
-          Save downstream triggers
-        </Button>
-      </div>
     </div>
   );
 }

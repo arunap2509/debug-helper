@@ -12,13 +12,6 @@ def ping(cfg):
     resp.raise_for_status()
 
 
-def get_requests(cfg) -> list[dict]:
-    resp = requests.get(f"{base_url(cfg)}/__admin/requests", timeout=5)
-    resp.raise_for_status()
-    data = resp.json()
-    return data.get("requests", [])
-
-
 def list_mappings(cfg):
     resp = requests.get(f"{base_url(cfg)}/__admin/mappings", timeout=5)
     resp.raise_for_status()
@@ -74,38 +67,4 @@ def try_request(cfg, method: str, path: str, headers: dict | None = None, body: 
         "body": parsed_body,
         "elapsedMs": elapsed_ms,
     }
-
-
-def get_logged_requests(cfg, limit=50, since_ms=None):
-    try:
-        resp = requests.get(f"{base_url(cfg)}/__admin/requests?limit={limit}", timeout=5)
-        resp.raise_for_status()
-        data = resp.json()
-        requests_list = data.get("requests", [])
-
-        result = []
-        for item in requests_list:
-            logged_date = item.get("loggedDate")
-            if since_ms and logged_date and logged_date < since_ms:
-                continue
-            req = item.get("request", {})
-            response_def = item.get("responseDefinition", {}) or item.get("response", {})
-            stub = item.get("stubMapping", {})
-            result.append(
-                {
-                    "id": item.get("id"),
-                    "loggedDate": logged_date,
-                    "loggedDateString": item.get("loggedDateString"),
-                    "url": req.get("url"),
-                    "method": req.get("method"),
-                    "headers": req.get("headers"),
-                    "body": req.get("body"),
-                    "status": response_def.get("status"),
-                    "wasMatched": item.get("wasMatched", True),
-                    "stubName": stub.get("name") or stub.get("id") or "Wiremock Stub",
-                }
-            )
-        return result
-    except Exception:
-        return []
 

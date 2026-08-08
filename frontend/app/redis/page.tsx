@@ -29,6 +29,7 @@ const CONSTANTS = {
   ALL_TYPES_FILTER: "ALL" as const,
   LABELS: {
     PAGE_TITLE: "Redis Data Explorer",
+    PAGE_SUBTITLE: "Inspect, update, and manage Redis cache keys and databases.",
     SEARCH_PLACEHOLDER: "Search keys by name or pattern...",
     NO_KEYS_MATCH: "No keys match the specified search or type filter.",
     SELECT_KEY_PROMPT: "Select a key from the left panel to inspect its value, structure, and metadata.",
@@ -49,7 +50,7 @@ const TYPE_TONES: Record<RedisValueType, "blue" | "amber" | "violet" | "green" |
 };
 
 export default function RedisPage() {
-  const { connections, selected, setSelected } = useConnections(CONSTANTS.SERVICE_TYPE);
+  const { connections, selected, setSelected, loadingConnections } = useConnections(CONSTANTS.SERVICE_TYPE);
   const [dbs, setDbs] = useState<RedisDb[] | null>(null);
   const [selectedDb, setSelectedDb] = useState(0);
 
@@ -215,13 +216,31 @@ export default function RedisPage() {
   const nonEmptyDbs = (dbs ?? []).filter((d) => d.keyCount > 0 || d.db === selectedDb);
   const displayDbs = nonEmptyDbs.length > 0 ? nonEmptyDbs : (dbs ?? []).filter((d) => d.db === 0);
 
-  if (connections !== null && connections.length === 0) {
+  if (loadingConnections || connections === null) {
     return (
       <div className="space-y-6">
         <PageHeader
           icon={theme.icon}
           iconClassName={`${theme.iconBg} ${theme.iconText}`}
           title={CONSTANTS.LABELS.PAGE_TITLE}
+          subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
+        />
+        <div className="flex items-center justify-center p-12 text-xs text-slate-500 gap-2">
+          <Spinner />
+          <span>Loading connections...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (connections.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          icon={theme.icon}
+          iconClassName={`${theme.iconBg} ${theme.iconText}`}
+          title={CONSTANTS.LABELS.PAGE_TITLE}
+          subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
         />
         <Card className="p-8 text-center space-y-4 max-w-xl mx-auto border-dashed border-slate-800">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
@@ -230,7 +249,7 @@ export default function RedisPage() {
           <div>
             <h3 className="text-base font-semibold text-slate-100">No Redis Connection Configured</h3>
             <p className="text-xs text-slate-400 mt-1">
-              There are no active Redis target connections. Add a connection in Admin to inspect Redis keys and cache.
+              There are no active Redis target connections. Add a connection in Admin to manage Redis data.
             </p>
           </div>
           <Link href="/admin">

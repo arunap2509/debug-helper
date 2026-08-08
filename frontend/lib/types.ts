@@ -106,24 +106,11 @@ export interface MessageVersion {
   createdAt: string;
 }
 
-export interface StepDownstream {
-  wiremockConn?: string | null;
-  wiremockMethod?: string | null;
-  wiremockPath?: string | null;
-  postgresConn?: string | null;
-  postgresSql?: string | null;
-  redisConn?: string | null;
-  redisAction?: string | null;
-  redisKey?: string | null;
-  redisValue?: string | null;
-}
-
 export interface WorkflowStep {
   id: string;
   queueName: string;
   activeVersionId: string | null;
   versions: MessageVersion[];
-  downstream?: StepDownstream | null;
 }
 
 export interface Workflow {
@@ -141,67 +128,10 @@ export interface SendMessageResult {
   sentAt: string;
 }
 
-export interface WiremockTelemetryItem {
-  id: string;
-  service: "wiremock";
-  time: string;
-  method: string;
-  url: string;
-  status: number;
-  stubName: string;
-  body?: string;
-}
-
-export interface RedisTelemetryItem {
-  id: string;
-  service: "redis";
-  time: string;
-  key?: string;
-  type?: string;
-  command?: string;
-  action: string;
-  ttl?: number;
-  body?: string;
-  error?: string;
-}
-
-export interface PostgresTelemetryItem {
-  id: string;
-  service: "postgres";
-  time: string;
-  query: string;
-  durationMs?: number;
-  state?: string;
-  rowsCount?: number;
-  error?: string;
-}
-
-export interface LocalstackTelemetryItem {
-  id: string;
-  service: "localstack";
-  time: string;
-  action: string;
-  queueName: string;
-  messageId: string;
-  body?: string;
-  md5?: string;
-}
-
 export interface WorkflowRunSession {
   runId: string;
-  startedAt: string;
+  startedAt?: string;
+  startedAtMs?: number;
   sentStepIds: string[];
   status: string;
-}
-
-export interface WorkflowTelemetry {
-  workflowId: string;
-  workflowName: string;
-  runId?: string;
-  startedAt?: string;
-  timestamp: string;
-  localstack: LocalstackTelemetryItem[];
-  wiremock: WiremockTelemetryItem[];
-  redis: RedisTelemetryItem[];
-  postgres: PostgresTelemetryItem[];
 }

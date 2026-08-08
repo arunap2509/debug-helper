@@ -9,22 +9,16 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Code,
-  Database,
-  Globe,
   Layers,
   Plus,
-  RefreshCw,
   RotateCcw,
-  Search,
   Send,
   Sliders,
   Trash2,
   Workflow as WorkflowIcon,
-  Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { SendMessageResult, Workflow, WorkflowTelemetry } from "@/lib/types";
+import { SendMessageResult, Workflow } from "@/lib/types";
 import { Badge, Button, Card, ErrorBox, PageHeader, Spinner } from "@/components/ui";
 import { JsonEditor, jsonValidity } from "@/components/CodeEditor";
 
@@ -51,7 +45,6 @@ export default function WorkflowRunPage() {
   const [sentByStep, setSentByStep] = useState<Record<string, SendMessageResult>>({});
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [telemetryKey, setTelemetryKey] = useState(0);
   const [purging, setPurging] = useState(false);
   const [purgedQueue, setPurgedQueue] = useState<string | null>(null);
 
@@ -61,7 +54,6 @@ export default function WorkflowRunPage() {
     try {
       await api.localstack.purgeQueue("localstack", step.queueName);
       setPurgedQueue(step.queueName);
-      setTelemetryKey((k) => k + 1);
       setTimeout(() => setPurgedQueue(null), 2500);
     } catch (e) {
       console.error("Purge queue error:", e);
@@ -114,7 +106,6 @@ export default function WorkflowRunPage() {
           }
         }
 
-        setTelemetryKey((k) => k + 1);
         setError(null);
       })
       .catch((e) => setError(String(e)))
@@ -172,7 +163,6 @@ export default function WorkflowRunPage() {
 
       const result = await api.workflows.send(workflow.id, step.id, versionIdToSend, currentBody);
       setSentByStep((s) => ({ ...s, [step.id]: result }));
-      setTelemetryKey((k) => k + 1);
 
       // Automatically advance to next step in workflow if not on last step
       if (stepIndex < workflow.steps.length - 1) {
@@ -195,7 +185,6 @@ export default function WorkflowRunPage() {
     setSentByStep({});
     setStepIndex(0);
     setSendError(null);
-    setTelemetryKey((k) => k + 1);
   };
 
   const handleDeleteRun = async () => {
@@ -208,7 +197,6 @@ export default function WorkflowRunPage() {
     setSentByStep({});
     setStepIndex(0);
     setSendError(null);
-    setTelemetryKey((k) => k + 1);
   };
 
   return (
@@ -225,6 +213,12 @@ export default function WorkflowRunPage() {
             <Badge tone={sentCount === workflow.steps.length ? "green" : "neutral"}>
               {sentCount}/{workflow.steps.length} sent
             </Badge>
+            <Link href={`/events?workflowId=${workflow.id}`}>
+              <Button variant="default">
+                <Activity className="h-3.5 w-3.5 text-cyan-400" />
+                Live Service Logs
+              </Button>
+            </Link>
             <Button variant="default" onClick={restart}>
               <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
               Reset Pipeline
@@ -437,277 +431,7 @@ export default function WorkflowRunPage() {
           </div>
         </Card>
       )}
-
-      {/* Live Cross-Service Telemetry Audit Log */}
-      <WorkflowTelemetryPanel workflowId={workflow.id} refreshKey={telemetryKey} />
     </div>
-  );
-}
-
-function WorkflowTelemetryPanel({ workflowId, refreshKey }: { workflowId: string; refreshKey?: number }) {
-  const [telemetry, setTelemetry] = useState<WorkflowTelemetry | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"all" | "localstack" | "wiremock" | "redis" | "postgres">("all");
-  const [filterText, setFilterText] = useState("");
-
-  const loadTelemetry = async () => {
-    setLoading(true);
-    try {
-      const res = await api.workflows.getTelemetry(workflowId);
-      if (res) setTelemetry(res);
-    } catch {
-      // Fail-safe silent catch for background polling
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadTelemetry();
-    const timer = setInterval(() => {
-      loadTelemetry();
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [workflowId, refreshKey]);
-
-  const localstackList = telemetry?.localstack?.filter(
-    (l) =>
-      !filterText.trim() ||
-      l.queueName.toLowerCase().includes(filterText.toLowerCase()) ||
-      (l.body && l.body.toLowerCase().includes(filterText.toLowerCase()))
-  ) ?? [];
-  const wiremockList = telemetry?.wiremock?.filter(
-    (w) =>
-      !filterText.trim() ||
-      w.url.toLowerCase().includes(filterText.toLowerCase()) ||
-      w.stubName.toLowerCase().includes(filterText.toLowerCase())
-  ) ?? [];
-  const redisList = telemetry?.redis?.filter(
-    (r) =>
-      !filterText.trim() ||
-      (r.key && r.key.toLowerCase().includes(filterText.toLowerCase())) ||
-      (r.command && r.command.toLowerCase().includes(filterText.toLowerCase()))
-  ) ?? [];
-  const postgresList = telemetry?.postgres?.filter(
-    (p) => !filterText.trim() || p.query.toLowerCase().includes(filterText.toLowerCase())
-  ) ?? [];
-
-  const totalCount = localstackList.length + wiremockList.length + redisList.length + postgresList.length;
-
-  return (
-    <Card className="p-4 border-slate-800 bg-slate-950/80 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-3">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-emerald-400" />
-          <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-            Live Workflow Telemetry & Cross-Service Inspector
-          </h3>
-          <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Live Audit Active
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
-            placeholder="Filter telemetry..."
-            className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs text-slate-200 placeholder:text-slate-600 focus:border-slate-700 focus:outline-none"
-          />
-          <Button variant="default" onClick={loadTelemetry} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 text-slate-400 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Service Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-800/60 pb-2">
-        <button
-          onClick={() => setActiveTab("all")}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-            activeTab === "all"
-              ? "bg-slate-800 text-slate-100 border border-slate-700"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-          }`}
-        >
-          <Activity className="h-3.5 w-3.5 text-indigo-400" />
-          All Events ({totalCount})
-        </button>
-
-        <button
-          onClick={() => setActiveTab("localstack")}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-            activeTab === "localstack"
-              ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-          }`}
-        >
-          <Layers className="h-3.5 w-3.5 text-emerald-400" />
-          LocalStack SQS ({localstackList.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab("wiremock")}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-            activeTab === "wiremock"
-              ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-          }`}
-        >
-          <Globe className="h-3.5 w-3.5 text-amber-400" />
-          Wiremock Calls ({wiremockList.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab("redis")}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-            activeTab === "redis"
-              ? "bg-rose-500/15 text-rose-300 border border-rose-500/30"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-          }`}
-        >
-          <Zap className="h-3.5 w-3.5 text-rose-400" />
-          Redis Cache ({redisList.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab("postgres")}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-            activeTab === "postgres"
-              ? "bg-sky-500/15 text-sky-300 border border-sky-500/30"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-          }`}
-        >
-          <Database className="h-3.5 w-3.5 text-sky-400" />
-          Postgres Queries ({postgresList.length})
-        </button>
-      </div>
-
-      {/* Tab Panels */}
-      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-        {(activeTab === "all" || activeTab === "localstack") &&
-          localstackList.map((l) => (
-            <div
-              key={l.id}
-              className="flex flex-col gap-1.5 rounded-xl border border-slate-800/80 bg-slate-900/40 p-3 text-xs font-mono"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge tone="green">LocalStack SQS</Badge>
-                  <span className="font-bold text-slate-200">{l.action}</span>
-                  <span className="text-emerald-300 font-semibold truncate max-w-[280px]">queue/{l.queueName}</span>
-                </div>
-                <span className="text-[10px] text-slate-500">{l.time.split("T")[1]?.slice(0, 8) || l.time}</span>
-              </div>
-              <div className="text-[11px] text-slate-400 flex items-center gap-2">
-                <span>MessageID: <code className="text-slate-300 font-mono">{l.messageId}</code></span>
-              </div>
-              {l.body && (
-                <div className="mt-1 rounded bg-slate-950 p-2 text-[11px] text-slate-300 overflow-x-auto">
-                  <pre>{l.body}</pre>
-                </div>
-              )}
-            </div>
-          ))}
-        {(activeTab === "all" || activeTab === "wiremock") &&
-          wiremockList.map((w) => (
-            <div
-              key={w.id}
-              className="flex flex-col gap-1.5 rounded-xl border border-slate-800/80 bg-slate-900/40 p-3 text-xs font-mono"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge tone="amber">Wiremock API</Badge>
-                  <span className="font-bold text-slate-200">{w.method}</span>
-                  <span className="text-slate-300 truncate max-w-[320px]">{w.url}</span>
-                  <span
-                    className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                      w.status >= 200 && w.status < 300
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                        : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                    }`}
-                  >
-                    {w.status > 0 ? `HTTP ${w.status}` : "FAILED"}
-                  </span>
-                </div>
-                <span className="text-[10px] text-slate-500">{w.time.split("T")[1]?.slice(0, 8) || w.time}</span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">Matched Stub: {w.stubName}</div>
-              {w.body && (
-                <div
-                  className={`mt-1 rounded bg-slate-950 p-2 text-[11px] overflow-x-auto ${
-                    w.status === 0 ? "text-rose-300" : "text-slate-300"
-                  }`}
-                >
-                  <pre>{w.body}</pre>
-                </div>
-              )}
-            </div>
-          ))}
-
-        {(activeTab === "all" || activeTab === "redis") &&
-          redisList.map((r) => {
-            const failed = r.action?.includes("FAILED");
-            return (
-              <div
-                key={r.id}
-                className={`flex flex-col gap-1 rounded-xl border p-2.5 text-xs font-mono ${
-                  failed ? "border-rose-900/60 bg-rose-950/20" : "border-slate-800/80 bg-slate-900/40"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge tone={failed ? "red" : "red"}>Redis Cache</Badge>
-                    <span className={`font-semibold ${failed ? "text-rose-400" : "text-rose-300"}`}>{r.action}</span>
-                    {r.key && <span className="text-slate-200 font-bold">{r.key}</span>}
-                    {r.command && <span className="text-slate-300 truncate max-w-[300px]">{r.command}</span>}
-                  </div>
-                  <span className="text-[10px] text-slate-500">{r.time.split("T")[1]?.slice(0, 8) || r.time}</span>
-                </div>
-                {failed && r.error && <div className="text-[11px] text-rose-300">{r.error}</div>}
-              </div>
-            );
-          })}
-
-        {(activeTab === "all" || activeTab === "postgres") &&
-          postgresList.map((p) => {
-            const failed = p.state === "failed";
-            return (
-              <div
-                key={p.id}
-                className={`flex flex-col gap-1.5 rounded-xl border p-2.5 text-xs font-mono ${
-                  failed ? "border-rose-900/60 bg-rose-950/20" : "border-slate-800/80 bg-slate-900/40"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Badge tone={failed ? "red" : "blue"}>{failed ? "Postgres FAILED" : "Postgres DB"}</Badge>
-                    <span className="text-slate-200 font-medium truncate max-w-[420px]">{p.query}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] shrink-0">
-                    {p.durationMs !== undefined && p.durationMs !== null && (
-                      <span className="text-emerald-400 font-bold">{p.durationMs}ms</span>
-                    )}
-                    <span className="text-slate-500">{p.time.split("T")[1]?.slice(0, 8) || p.time}</span>
-                  </div>
-                </div>
-                {failed && p.error && <div className="text-[11px] text-rose-300">{p.error}</div>}
-              </div>
-            );
-          })}
-
-        {totalCount === 0 && (
-          <div className="text-center py-6 text-xs text-slate-500">
-            No activity logged yet for this run. Send a step above to see it ripple across LocalStack, Wiremock,
-            Redis and Postgres — configure downstream Wiremock/Postgres/Redis triggers per step on the Workflows
-            page to see more than just the SQS send.
-          </div>
-        )}
-      </div>
-    </Card>
   );
 }
 

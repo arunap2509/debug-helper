@@ -28,6 +28,7 @@ FIELD_SCHEMAS = {
         {"name": "user", "kind": "text", "default": "appuser"},
         {"name": "password", "kind": "password", "default": "apppass"},
         {"name": "dbname", "kind": "text", "default": "appdb"},
+        {"name": "containerName", "kind": "text", "default": "wh-postgres"},
     ],
     "redis": [
         {"name": "host", "kind": "text", "default": "localhost"},
@@ -43,6 +44,7 @@ FIELD_SCHEMAS = {
         {"name": "region", "kind": "text", "default": "us-east-1"},
         {"name": "access_key", "kind": "text", "default": "test"},
         {"name": "secret_key", "kind": "password", "default": "test"},
+        {"name": "containerName", "kind": "text", "default": "localstack-main"},
     ],
 }
 

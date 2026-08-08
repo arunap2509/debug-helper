@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .routers import connections, localstack_router, postgres_router, redis_router, status, wiremock_router, workflows
+from .routers import connections, events, localstack_router, postgres_router, redis_router, status, wiremock_router, workflows
 
 app = FastAPI(title="work-helper backend")
 
@@ -29,6 +29,7 @@ app.include_router(redis_router.router)
 app.include_router(wiremock_router.router)
 app.include_router(localstack_router.router)
 app.include_router(workflows.router)
+app.include_router(events.router)
 
 
 @app.get("/api/health")

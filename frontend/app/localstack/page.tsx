@@ -50,7 +50,7 @@ const CONSTANTS = {
 type Tab = "queues" | "buckets" | "ssm";
 
 export default function LocalStackPage() {
-  const { connections, selected, setSelected } = useConnections(CONSTANTS.SERVICE_TYPE);
+  const { connections, selected, setSelected, loadingConnections } = useConnections(CONSTANTS.SERVICE_TYPE);
   const [tab, setTab] = useState<Tab>("queues");
   const [queues, setQueues] = useState<SqsQueue[] | null>(null);
   const [buckets, setBuckets] = useState<S3Bucket[] | null>(null);
@@ -145,7 +145,24 @@ export default function LocalStackPage() {
 
   const theme = SERVICE_THEME.localstack;
 
-  if (connections !== null && connections.length === 0) {
+  if (loadingConnections || connections === null) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          icon={theme.icon}
+          iconClassName={`${theme.iconBg} ${theme.iconText}`}
+          title={CONSTANTS.LABELS.PAGE_TITLE}
+          subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
+        />
+        <div className="flex items-center justify-center p-12 text-xs text-slate-500 gap-2">
+          <Spinner />
+          <span>Loading connections...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (connections.length === 0) {
     return (
       <div className="space-y-6">
         <PageHeader

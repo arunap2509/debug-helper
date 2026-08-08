@@ -152,7 +152,7 @@ function analyzeConflicts(allMappings: WiremockMapping[]): Record<string, Confli
 }
 
 export default function WiremockPage() {
-  const { connections, selected, setSelected } = useConnections(CONSTANTS.SERVICE_TYPE);
+  const { connections, selected, setSelected, loadingConnections } = useConnections(CONSTANTS.SERVICE_TYPE);
   const [mappings, setMappings] = useState<WiremockMapping[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -289,7 +289,24 @@ export default function WiremockPage() {
   const groupKeys = Object.keys(groupedMappings).sort();
   const theme = SERVICE_THEME.wiremock;
 
-  if (connections !== null && connections.length === 0) {
+  if (loadingConnections || connections === null) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          icon={theme.icon}
+          iconClassName={`${theme.iconBg} ${theme.iconText}`}
+          title={CONSTANTS.LABELS.PAGE_TITLE}
+          subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
+        />
+        <div className="flex items-center justify-center p-12 text-xs text-slate-500 gap-2">
+          <Spinner />
+          <span>Loading connections...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (connections.length === 0) {
     return (
       <div className="space-y-6">
         <PageHeader

@@ -245,13 +245,3 @@ def resolve_message(workflow_id: str, step_id: str, version_id: str | None = Non
         raise KeyError(vid)
 
     return wf["localstackConn"], step["queueName"], version["body"]
-
-
-def update_step_downstream(workflow_id: str, step_id: str, downstream: dict | None) -> dict:
-    state = _load()
-    wf = _find(state, workflow_id)
-    step = _find_step(wf, step_id)
-    step["downstream"] = downstream
-    wf["updatedAt"] = _now()
-    _save(state)
-    return get(workflow_id)
