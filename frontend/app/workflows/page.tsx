@@ -35,12 +35,17 @@ const CONSTANTS = {
     NEW_WORKFLOW_TITLE: "Create New Workflow",
     WORKFLOW_NAME_PLACEHOLDER: "e.g. Order Processing Pipeline",
     MIN_CHARS_HELP: "Workflow name must be more than 5 characters to create.",
-    NO_WORKFLOWS: "No workflows created yet. Enter a name above to create your first pipeline.",
+    NO_WORKFLOWS_TITLE: "No Queue Workflows Created Yet",
+    NO_WORKFLOWS_SUBTITLE: "Build multi-step SQS queue pipelines to automate message generation and testing.",
+    CREATE_FIRST_WORKFLOW_BUTTON: "Create Your First Workflow",
+    NO_CONNECTION_TITLE: "No LocalStack Connection Configured",
+    NO_CONNECTION_SUBTITLE: "There are no active LocalStack target connections. Add a connection in Admin to build queue workflows.",
+    CONFIGURE_CONNECTION_BUTTON: "Configure LocalStack Connection in Admin",
   },
 } as const;
 
 export default function WorkflowsPage() {
-  const { connections: localstackConnections, selected: newConn, setSelected: setNewConn } =
+  const { connections: localstackConnections, selected: newConn, setSelected: setNewConn, loadingConnections } =
     useConnections(CONSTANTS.SERVICE_TYPE);
   const [workflows, setWorkflows] = useState<Workflow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +53,7 @@ export default function WorkflowsPage() {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [runSessions, setRunSessions] = useState<Record<string, WorkflowRunSession>>({});
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
     setLoading(true);
@@ -119,6 +125,53 @@ export default function WorkflowsPage() {
 
   const theme = SERVICE_THEME.localstack;
 
+  if (loadingConnections || localstackConnections === null) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          icon={WorkflowIcon}
+          iconClassName="bg-emerald-500/15 text-emerald-400"
+          title={CONSTANTS.LABELS.PAGE_TITLE}
+          subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
+        />
+        <div className="flex items-center justify-center p-12 text-xs text-slate-500 gap-2">
+          <Spinner />
+          <span>Loading connections...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (localstackConnections.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          icon={WorkflowIcon}
+          iconClassName="bg-emerald-500/15 text-emerald-400"
+          title={CONSTANTS.LABELS.PAGE_TITLE}
+          subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
+        />
+        <Card className="p-8 text-center space-y-4 max-w-xl mx-auto border-dashed border-slate-800">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-slate-100">{CONSTANTS.LABELS.NO_CONNECTION_TITLE}</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              {CONSTANTS.LABELS.NO_CONNECTION_SUBTITLE}
+            </p>
+          </div>
+          <Link href="/admin">
+            <Button variant="primary">
+              <Plus className="h-3.5 w-3.5" />
+              {CONSTANTS.LABELS.CONFIGURE_CONNECTION_BUTTON}
+            </Button>
+          </Link>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
@@ -150,6 +203,7 @@ export default function WorkflowsPage() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-[260px] flex-1">
             <input
+              ref={nameInputRef}
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -204,9 +258,21 @@ export default function WorkflowsPage() {
         ))}
 
         {!loading && workflows?.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/60 p-12 text-center text-xs text-slate-500">
-            {CONSTANTS.LABELS.NO_WORKFLOWS}
-          </div>
+          <Card className="p-8 text-center space-y-4 max-w-xl mx-auto border-dashed border-slate-800">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <WorkflowIcon className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-slate-100">{CONSTANTS.LABELS.NO_WORKFLOWS_TITLE}</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                {CONSTANTS.LABELS.NO_WORKFLOWS_SUBTITLE}
+              </p>
+            </div>
+            <Button variant="primary" onClick={() => nameInputRef.current?.focus()}>
+              <Plus className="h-3.5 w-3.5" />
+              {CONSTANTS.LABELS.CREATE_FIRST_WORKFLOW_BUTTON}
+            </Button>
+          </Card>
         )}
       </div>
     </div>

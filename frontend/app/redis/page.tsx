@@ -85,7 +85,9 @@ export default function RedisPage() {
 
   const loadDbs = (refresh = false) => {
     if (!selected) {
-      setLoadingDbs(false);
+      if (!loadingConnections) {
+        setLoadingDbs(false);
+      }
       return;
     }
     setLoadingDbs(true);
@@ -107,7 +109,12 @@ export default function RedisPage() {
   };
 
   const loadKeys = (refresh = false) => {
-    if (!selected) return;
+    if (!selected) {
+      if (!loadingConnections) {
+        setLoadingKeys(false);
+      }
+      return;
+    }
     setLoadingKeys(true);
     const pattern = formatPattern(searchQuery);
     api.redis
@@ -132,12 +139,16 @@ export default function RedisPage() {
   };
 
   useEffect(() => {
-    loadDbs();
+    if (selected) {
+      loadDbs();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
   useEffect(() => {
-    loadKeys();
+    if (selected) {
+      loadKeys();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, selectedDb]);
 
@@ -216,24 +227,7 @@ export default function RedisPage() {
   const nonEmptyDbs = (dbs ?? []).filter((d) => d.keyCount > 0 || d.db === selectedDb);
   const displayDbs = nonEmptyDbs.length > 0 ? nonEmptyDbs : (dbs ?? []).filter((d) => d.db === 0);
 
-  if (loadingConnections || connections === null) {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          icon={theme.icon}
-          iconClassName={`${theme.iconBg} ${theme.iconText}`}
-          title={CONSTANTS.LABELS.PAGE_TITLE}
-          subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
-        />
-        <div className="flex items-center justify-center p-12 text-xs text-slate-500 gap-2">
-          <Spinner />
-          <span>Loading connections...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (connections.length === 0) {
+  if (loadingConnections || connections === null || connections.length === 0) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -243,21 +237,30 @@ export default function RedisPage() {
           subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
         />
         <Card className="p-8 text-center space-y-4 max-w-xl mx-auto border-dashed border-slate-800">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-            <AlertCircle className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-base font-semibold text-slate-100">No Redis Connection Configured</h3>
-            <p className="text-xs text-slate-400 mt-1">
-              There are no active Redis target connections. Add a connection in Admin to manage Redis data.
-            </p>
-          </div>
-          <Link href="/admin">
-            <Button variant="primary">
-              <Plus className="h-3.5 w-3.5" />
-              Configure Redis Connection in Admin
-            </Button>
-          </Link>
+          {loadingConnections || connections === null ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500">
+              <Spinner />
+              <span>Loading connections...</span>
+            </div>
+          ) : (
+            <>
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-slate-100">No Redis Connection Configured</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  There are no active Redis target connections. Add a connection in Admin to manage Redis data.
+                </p>
+              </div>
+              <Link href="/admin">
+                <Button variant="primary">
+                  <Plus className="h-3.5 w-3.5" />
+                  Configure Redis Connection in Admin
+                </Button>
+              </Link>
+            </>
+          )}
         </Card>
       </div>
     );
@@ -419,14 +422,14 @@ export default function RedisPage() {
 
           {/* Key List Body */}
           <div className="flex-1 min-h-[360px] max-h-[500px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-            {loadingKeys && !keys && (
+            {(loadingKeys || keys === null) && (
               <div className="flex h-48 flex-col items-center justify-center gap-2 text-xs text-slate-500">
                 <Spinner />
                 <span>Scanning database keys...</span>
               </div>
             )}
 
-            {!loadingKeys && filteredKeys.length === 0 && (
+            {!loadingKeys && keys !== null && filteredKeys.length === 0 && (
               <div className="flex h-48 flex-col items-center justify-center text-center p-4">
                 <Key className="h-8 w-8 text-slate-700 mb-2" />
                 <p className="text-xs text-slate-400 font-medium">No matching keys</p>
@@ -436,7 +439,7 @@ export default function RedisPage() {
               </div>
             )}
 
-            {filteredKeys.map((k) => {
+            {!loadingKeys && keys !== null && filteredKeys.map((k) => {
               const isSelected = selectedKey?.key === k.key;
               const tone = TYPE_TONES[k.type] ?? "neutral";
 

@@ -57,7 +57,7 @@ export default function LocalStackPage() {
   const [ssm, setSsm] = useState<SsmParam[] | null>(null);
   const [revealSecrets, setRevealSecrets] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Create Resource Modal States
@@ -77,7 +77,9 @@ export default function LocalStackPage() {
 
   const load = (refresh = false) => {
     if (!selected) {
-      setLoading(false);
+      if (!loadingConnections) {
+        setLoading(false);
+      }
       return;
     }
     setLoading(true);
@@ -92,7 +94,9 @@ export default function LocalStackPage() {
   };
 
   useEffect(() => {
-    load();
+    if (selected) {
+      load();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, selected]);
 
@@ -145,24 +149,7 @@ export default function LocalStackPage() {
 
   const theme = SERVICE_THEME.localstack;
 
-  if (loadingConnections || connections === null) {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          icon={theme.icon}
-          iconClassName={`${theme.iconBg} ${theme.iconText}`}
-          title={CONSTANTS.LABELS.PAGE_TITLE}
-          subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
-        />
-        <div className="flex items-center justify-center p-12 text-xs text-slate-500 gap-2">
-          <Spinner />
-          <span>Loading connections...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (connections.length === 0) {
+  if (loadingConnections || connections === null || connections.length === 0) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -172,21 +159,30 @@ export default function LocalStackPage() {
           subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
         />
         <Card className="p-8 text-center space-y-4 max-w-xl mx-auto border-dashed border-slate-800">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-            <AlertCircle className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-base font-semibold text-slate-100">No LocalStack Connection Configured</h3>
-            <p className="text-xs text-slate-400 mt-1">
-              There are no active LocalStack target connections. Add a connection in Admin to monitor SQS queues and S3 buckets.
-            </p>
-          </div>
-          <Link href="/admin">
-            <Button variant="primary">
-              <Plus className="h-3.5 w-3.5" />
-              Configure LocalStack Connection in Admin
-            </Button>
-          </Link>
+          {loadingConnections || connections === null ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500">
+              <Spinner />
+              <span>Loading connections...</span>
+            </div>
+          ) : (
+            <>
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-slate-100">No LocalStack Connection Configured</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  There are no active LocalStack target connections. Add a connection in Admin to monitor SQS queues and S3 buckets.
+                </p>
+              </div>
+              <Link href="/admin">
+                <Button variant="primary">
+                  <Plus className="h-3.5 w-3.5" />
+                  Configure LocalStack Connection in Admin
+                </Button>
+              </Link>
+            </>
+          )}
         </Card>
       </div>
     );
@@ -353,7 +349,21 @@ export default function LocalStackPage() {
       {/* SQS Queues Tab */}
       {tab === "queues" && selected && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {filteredQueues.map((q) => (
+          {(loading || queues === null) && (
+            <div className="col-span-full flex h-48 items-center justify-center gap-2 text-xs text-slate-500">
+              <Spinner />
+              <span>Fetching SQS queue configurations...</span>
+            </div>
+          )}
+
+          {!loading && queues !== null && filteredQueues.length === 0 && (
+            <div className="col-span-full rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-12 text-center">
+              <Inbox className="mx-auto h-10 w-10 text-slate-600 mb-2" />
+              <p className="text-xs text-slate-500 font-medium">{CONSTANTS.LABELS.NO_QUEUES}</p>
+            </div>
+          )}
+
+          {!loading && queues !== null && filteredQueues.map((q) => (
             <QueueCard
               key={q.name}
               queue={q}
@@ -366,20 +376,6 @@ export default function LocalStackPage() {
               }
             />
           ))}
-
-          {filteredQueues.length === 0 && queues !== null && (
-            <div className="col-span-full rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-12 text-center">
-              <Inbox className="mx-auto h-10 w-10 text-slate-600 mb-2" />
-              <p className="text-xs text-slate-500 font-medium">{CONSTANTS.LABELS.NO_QUEUES}</p>
-            </div>
-          )}
-
-          {!queues && loading && (
-            <div className="col-span-full flex h-48 items-center justify-center gap-2 text-xs text-slate-500">
-              <Spinner />
-              <span>Fetching SQS queue configurations...</span>
-            </div>
-          )}
         </div>
       )}
 

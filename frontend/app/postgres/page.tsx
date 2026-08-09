@@ -101,7 +101,9 @@ export default function PostgresPage() {
 
   const load = (refresh = false) => {
     if (!selected) {
-      setLoading(false);
+      if (!loadingConnections) {
+        setLoading(false);
+      }
       setIsRefreshing(false);
       return;
     }
@@ -128,7 +130,9 @@ export default function PostgresPage() {
   };
 
   useEffect(() => {
-    load();
+    if (selected) {
+      load();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
@@ -201,24 +205,7 @@ export default function PostgresPage() {
     return matchesTableName || matchesColumnName;
   });
 
-  if (loadingConnections || connections === null) {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          icon={theme.icon}
-          iconClassName={`${theme.iconBg} ${theme.iconText}`}
-          title={CONSTANTS.LABELS.PAGE_TITLE}
-          subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
-        />
-        <div className="flex items-center justify-center p-12 text-xs text-slate-500 gap-2">
-          <Spinner />
-          <span>Loading connections...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (connections.length === 0) {
+  if (loadingConnections || connections === null || connections.length === 0) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -228,21 +215,30 @@ export default function PostgresPage() {
           subtitle={CONSTANTS.LABELS.PAGE_SUBTITLE}
         />
         <Card className="p-8 text-center space-y-4 max-w-xl mx-auto border-dashed border-slate-800">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-            <AlertCircle className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-base font-semibold text-slate-100">No Postgres Connection Configured</h3>
-            <p className="text-xs text-slate-400 mt-1">
-              There are no active Postgres target connections. Add a connection in Admin to inspect database tables.
-            </p>
-          </div>
-          <Link href="/admin">
-            <Button variant="primary">
-              <Plus className="h-3.5 w-3.5" />
-              Configure Postgres Connection in Admin
-            </Button>
-          </Link>
+          {loadingConnections || connections === null ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500">
+              <Spinner />
+              <span>Loading connections...</span>
+            </div>
+          ) : (
+            <>
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-slate-100">No Postgres Connection Configured</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  There are no active Postgres target connections. Add a connection in Admin to inspect database tables.
+                </p>
+              </div>
+              <Link href="/admin">
+                <Button variant="primary">
+                  <Plus className="h-3.5 w-3.5" />
+                  Configure Postgres Connection in Admin
+                </Button>
+              </Link>
+            </>
+          )}
         </Card>
       </div>
     );
@@ -289,21 +285,21 @@ export default function PostgresPage() {
           </div>
 
           <div className="flex-1 min-h-[360px] max-h-[580px] overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
-            {loading && !tables && (
+            {(loading || tables === null) && (
               <div className="flex h-48 flex-col items-center justify-center gap-2 text-xs text-slate-500">
                 <Spinner />
                 <span>Reading Postgres schema tables...</span>
               </div>
             )}
 
-            {!loading && filteredTables.length === 0 && (
+            {!loading && tables !== null && filteredTables.length === 0 && (
               <div className="flex h-48 flex-col items-center justify-center text-center p-4">
                 <Table className="h-8 w-8 text-slate-700 mb-2" />
                 <p className="text-xs text-slate-400 font-medium">{CONSTANTS.LABELS.NO_TABLES_FOUND}</p>
               </div>
             )}
 
-            {filteredTables.map((t) => {
+            {!loading && tables !== null && filteredTables.map((t) => {
               const isSelected = selectedTable?.name === t.name;
 
               return (

@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { invalidateConnectionsCache } from "@/lib/useConnections";
 import { Connection, FieldSchema, ServiceType, StatusEntry } from "@/lib/types";
 import { SERVICE_THEME } from "@/lib/theme";
 import { Badge, Button, Card, ErrorBox, PageHeader, Spinner } from "@/components/ui";
@@ -131,6 +132,7 @@ export default function AdminPage() {
       }
       const updated = await api.connections.update(conn.id, { fields });
       setConnections((cs) => cs!.map((c) => (c.id === conn.id ? updated : c)));
+      invalidateConnectionsCache();
 
       const stats = await api.status();
       const statusMap: Record<string, StatusEntry> = {};
@@ -155,6 +157,7 @@ export default function AdminPage() {
     try {
       await api.connections.remove(conn.id);
       setConnections((cs) => cs!.filter((c) => c.id !== conn.id));
+      invalidateConnectionsCache();
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -173,6 +176,7 @@ export default function AdminPage() {
       }
       const created = await api.connections.create(newType, newLabel || SERVICE_THEME[newType].label, fields);
       setConnections((cs) => [...(cs ?? []), created]);
+      invalidateConnectionsCache();
       setDrafts((d) => ({ ...d, [created.id]: toDraft(created.fields) }));
 
       const stats = await api.status();
