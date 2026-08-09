@@ -67,11 +67,15 @@ def get_redis_events(connId: str, since: float | int | None = None):
 
     try:
         r = redis.Redis(host=host, port=port, socket_timeout=3)
+        r.config_set("slowlog-log-slower-than", 0)
         slowlogs = r.slowlog_get(200)
     except Exception as exc:
         raise HTTPException(502, f"Failed to connect to Redis container at {host}:{port}: {exc}") from exc
 
     since_sec = int(since / 1000) if (since and since > 10000000000) else int(since or 0)
+
+    # Commands from redis-py connection setup — not application traffic
+    _NOISE = ("CONFIG ", "CLIENT ", "HELLO", "PING", "COMMAND", "SLOWLOG")
 
     results = []
     for entry in slowlogs:
@@ -83,6 +87,9 @@ def get_redis_events(connId: str, since: float | int | None = None):
                     command = command.decode("utf-8", errors="ignore")
                 elif isinstance(command, list):
                     command = " ".join([c.decode("utf-8", errors="ignore") if isinstance(c, bytes) else str(c) for c in command])
+
+                if any(str(command).upper().startswith(n) for n in _NOISE):
+                    continue
 
                 time_formatted = ""
                 if start_time > 0:

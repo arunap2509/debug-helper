@@ -429,7 +429,7 @@ function EventsPageContent() {
                   (item.loggedDate ? new Date(item.loggedDate).toLocaleString() : item.startTime ? new Date(item.startTime * 1000).toLocaleString() : "");
 
                 return (
-                  <div key={item.id || idx} className="hover:bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 mb-2 space-y-2">
+                  <div key={`${idx}-${item.id ?? ''}`} className="hover:bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 mb-2 space-y-2">
                     <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2 border-b border-slate-800/60 pb-1.5">
                       <div className="flex items-center gap-2">
                         {item.method && <Badge tone={item.method === "GET" ? "blue" : item.method === "POST" ? "green" : "neutral"}>{item.method}</Badge>}
